@@ -5,11 +5,11 @@
 ### Declutter your desktop session files
 
 
-if [[ $UID -ne 0  ]];then
-    printf '%s\n' "Always use sudo before running this script"
-    printf '%s\n' "Usage: sudo $(basename "$0")"
-    exit 0
-fi
+# if [[ $UID -ne 0  ]];then
+#     printf '%s\n' "Always use sudo before running this script"
+#     printf '%s\n' "Usage: sudo $(basename "$0")"
+#     exit 0
+# fi
 
 function RestoreBackup() {
     local file="$1"
@@ -20,7 +20,7 @@ function RestoreBackup() {
 
 function Wayland_sway_desktop() {
     local desktop_file="$1"
-    cat > "${desktop_file}" << EOF
+    sudo tee "${desktop_file}" &>/dev/null << EOF
 [Desktop Entry]
 Name=Sway (Wayland)
 Comment=An i3-compatible Wayland compositor
@@ -32,16 +32,17 @@ Exec=env \
     GDK_BACKEND=wayland \
     XDG_DESKTOP_PORTAL_BACKEND=wlr \
     QT_QPA_PLATFORMTHEME=qt6ct \
-    WLR_RENDERER=vulkan sway --unsupported-gpu
+    WLR_RENDERER=vulkan sway
 Type=Application
 Keywords=tiling;wayland;compositor;sway;
 
 EOF
+    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
 }
 
 function Wayland_hyprland_desktop() {
     local desktop_file="$1"
-    cat > "${desktop_file}" << EOF
+    sudo tee "${desktop_file}" &>/dev/null << EOF
 [Desktop Entry]
 Name=Hyprland (Wayland)
 Comment=An intelligent dynamic tiling Wayland compositor
@@ -53,11 +54,12 @@ Type=Application
 Keywords=tiling;wayland;compositor;hyprland;
 
 EOF
+    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
 }
 
 function Wayland_plasma_desktop() {
     local desktop_file="$1"
-    cat > "${desktop_file}" << EOF
+    sudo tee "${desktop_file}" &>/dev/null << EOF
 [Desktop Entry]
 Name=Plasma (Wayland)
 Comment=Plasma by KDE
@@ -67,11 +69,12 @@ TryExec=/usr/bin/startplasma-wayland
 Keywords=plasma;kde;
 
 EOF
+    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
 }
 
 function Wayland_gnome_desktop() {
     local desktop_file="$1"
-    cat > "${desktop_file}" << EOF
+    sudo tee "${desktop_file}" &>/dev/null << EOF
 [Desktop Entry]
 Name=GNOME (Wayland)
 Type=Application
@@ -83,11 +86,12 @@ X-GDM-SessionRegisters=true
 X-GDM-CanRunHeadless=true
 
 EOF
+    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
 }
 
 function X11_i3_desktop() {
     local desktop_file="$1"
-    cat > "${desktop_file}" << EOF
+    sudo tee "${desktop_file}" &>/dev/null << EOF
 [Desktop Entry]
 Name=i3 (X11)
 Type=Application
@@ -99,11 +103,12 @@ X-LightDM-DesktopName=i3
 Keywords=tiling;wm;windowmanager;window;manager;
 
 EOF
+    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
 }
 
 function X11_gnome_desktop() {
     local desktop_file="$1"
-    cat > "${desktop_file}" << EOF
+    sudo tee "${desktop_file}" &>/dev/null << EOF
 [Desktop Entry]
 Name=GNOME (X11)
 Type=Application
@@ -115,11 +120,12 @@ X-GDM-SessionRegisters=true
 X-GDM-CanRunHeadless=true
 
 EOF
+    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
 }
 
 function X11_plasma_desktop() {
     local desktop_file="$1"
-    cat > "${desktop_file}" << EOF
+    sudo tee "${desktop_file}" &>/dev/null << EOF
 [Desktop Entry]
 Name=Plasma (X11)
 Type=XSession
@@ -130,13 +136,14 @@ Comment=Plasma by KDE
 X-KDE-PluginInfo-Version=6.3.1
 
 EOF
+    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
 }
 
 function RestoreWaylandDesktopFiles() {
     cd /usr/share/wayland-sessions; for file in *; do
         case "${file}" in
             *classic*|*uwsm*|gnome.*)
-                rm -f "${file}"
+                sudo rm -f "${file}"
             ;;
         esac
 
@@ -162,7 +169,7 @@ function RestoreX11DesktopFiles() {
     cd /usr/share/xsessions; for file in *; do
         case "${file}" in
             *classic*|*gnome-*|*with*)
-                rm -f "${file}"
+                sudo rm -f "${file}"
             ;;
         esac
 

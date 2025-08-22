@@ -8,7 +8,7 @@ trap Cleanup SIGTERM SIGINT
 ### Journal directory (All your journal's will be here)
 JOURNAL_DIR="${HOME}/journalD"
 ### tr TRANSFORM_KEY file
-TRANSFORM_KEY="${HOME}/._tr"
+TRANSFORM_KEY="${HOME}/.custom/encryption_keys/$(basename "$0")"
 ### Any existing template you want
 TEMPLATE="${JOURNAL_DIR}/.template"
 ### Line of text after and including from the template will be part of journal template
@@ -44,7 +44,8 @@ function CreateNewKey() {
     local -r NEW_KEY="$(printf "%s -> %s\n" "$(echo {{A..Z},{a..z}} | tr ' ' '\n' | shuf | tr -d '\n' )" "$(echo {{A..Z},{a..z}} | tr -d ' ')")"
     if [[ -n "${NEW_KEY}" ]]; then
         echo "${NEW_KEY}" > "${TRANSFORM_KEY}" && \
-            LOG info "New key generated: ${NEW_KEY}"
+            LOG info "New key saved at '$(ColorPath "${TRANSFORM_KEY}")'"
+        cp "${TRANSFORM_KEY}" "${TRANSFORM_KEY}.bak"
     else
         LOG error "Failed to create new key"
     fi
@@ -75,16 +76,18 @@ function Cleanup() {
 }
 
 function ShowJournal() {
-    [[ -s ${TRANSFORM_KEY} ]] && local -r KEY="$(cat ${TRANSFORM_KEY} | cut -d' ' -f1)" || \
+    local file="${1:-"${JOURNAL_DIR}/${JOURNAL_FILE}"}"
+
+    [[ -s "${TRANSFORM_KEY}" ]] && local -r KEY="$(cat "${TRANSFORM_KEY}" | cut -d' ' -f1)" || \
         local -r KEY="${TRANSFORM_KEY}"
     [[ -n $KEY ]] && {
-        LOG info "From file: ${JOURNAL_DIR}/${JOURNAL_FILE}\n"
+        LOG info "File: '${file}'\n"
         if command -v bat &> /dev/null; then
             bat --language=md --paging=never --decorations=never --color=always \
-                <(tr "$KEY" 'A-Za-z' < "${JOURNAL_DIR}/${JOURNAL_FILE}")
-            return 0
+                <(tr "$KEY" 'A-Za-z' < "${file}")
+            return $?
         else
-            tr "$KEY" 'A-Za-z' < "${JOURNAL_DIR}/${JOURNAL_FILE}"
+            tr "$KEY" 'A-Za-z' < "${file}"
         fi
     }
     LOG info "Process completed, exiting..."
@@ -104,17 +107,27 @@ function ShowTemplate() {
 function EditTemplate() {
     export EDITOR
     local BACKUP="${TEMPLATE}_$(date +%s).bak"
-    LOG info "Copying last changes: ${LIGHT_GREEN}${TEMPLATE}${NC} ==> $(ColorPath "${BACKUP}")"
-    cp "${TEMPLATE}" "${BACKUP}"
-    LOG info "Editing template: $(ColorPath "${TEMPLATE}")"
-    "${EDITOR:-"vim"}" "${TEMPLATE}"
+    local temp_file="$(mktemp -t template.XXXX)"
+
+    LOG info "Edit template: $(ColorPath "${TEMPLATE}")"
+    cp "${TEMPLATE}" "${temp_file}"
+    "${EDITOR:-"vim"}" "${temp_file}"
+
+    [[ ! -f "${temp_file}" ]] && return 0
+
+    if ! cmp -s "${TEMPLATE}" "${temp_file}"; then
+        LOG info "New changes:"
+        diff --color=auto "${TEMPLATE}" "${temp_file}"
+        LOG info "Copying last changes: ${LIGHT_GREEN}${TEMPLATE}${NC} ==> $(ColorPath "${BACKUP}")"
+        cp "${TEMPLATE}" "${BACKUP}"
+    fi
 }
 
 function EditJournalFile() {
     ### If file doesn't exist and empty, create the file and provide a default template
 
     ### Create a temporary file
-    TEMP_FILE="$(mktemp ${JOURNAL_DIR}/.${JOURNAL_FILE}.XXXXXX.tmp)"
+    TEMP_FILE="$(mktemp "${JOURNAL_DIR}/.${JOURNAL_FILE}.XXXXXX.tmp")"
     local Editor="$1"
     local verbose="$2"
 
@@ -123,9 +136,6 @@ function EditJournalFile() {
             LOG info "Editor '${Editor^}' not found faling back to vim"
             Editor="vim"
         }
-    else
-        LOG error "No editor given."
-        return 0
     fi
 
     [[ -s "${TEMPLATE}" ]] || {
@@ -140,12 +150,12 @@ function EditJournalFile() {
     [[ $verbose -eq 1 ]] && LOG info "Editor Initialized: ${Editor^}"
     if [[ "$Editor" == "vim" ]]; then
         DecodeTextFile "${JOURNAL_DIR}/${JOURNAL_FILE}" "$TEMP_FILE" $verbose
-        [[ $verbose -eq 1 ]] && LOG info "Editing temporary file '$(ColorPath "${TEMP_FILE}")'"
+        [[ $verbose -eq 1 ]] && LOG info "Edit temporary file '$(ColorPath "${TEMP_FILE}")'"
         sleep 0.01; vim -c 'colorscheme slate' "$TEMP_FILE"
         Cleanup $verbose
     else
         DecodeTextFile "${JOURNAL_DIR}/${JOURNAL_FILE}" "$TEMP_FILE" $verbose
-        [[ $verbose -eq 1 ]] && LOG info "Editing temporary file '$(ColorPath "${TEMP_FILE}")'"
+        [[ $verbose -eq 1 ]] && LOG info "Edit temporary file '$(ColorPath "${TEMP_FILE}")'"
         sleep 0.01; "${Editor:-"vim"}" "$TEMP_FILE"
         Cleanup $verbose
     fi
@@ -180,18 +190,20 @@ function Usage() {
 function main() {
     local -a ARGS=("$@")
 
-    local edit_file=0
-    local edit_template=0
+    local -i edit_file=0
+    local -i edit_template=0
+    local -i verbose=0
     local Editor=""
-    local verbose=0
+
+    mkdir -p "$(dirname "${TRANSFORM_KEY}")"
 
     if [[ -s "${TRANSFORM_KEY}" ]]; then
-        TRANSFORM_KEY="$(cat ${TRANSFORM_KEY} | cut -d' ' -f1)"
+        TRANSFORM_KEY="$(cat "${TRANSFORM_KEY}" | cut -d' ' -f1)"
     else
-        CreateNewKey && TRANSFORM_KEY="$(cat ${TRANSFORM_KEY} | cut -d' ' -f1)"
+        CreateNewKey && TRANSFORM_KEY="$(cat "${TRANSFORM_KEY}" | cut -d' ' -f1)"
     fi
 
-    [[ -z $TRANSFORM_KEY ]] && {
+    [[ -z "${TRANSFORM_KEY}" ]] && {
         LOG error "Transform_key is empty"
         return 1
     }
@@ -210,11 +222,11 @@ function main() {
         case "$arg" in
             -s|s|--show|show|--view|view)
                 ShowJournal
-                return 0
+                return $?
                 ;;
             -r|r|--review|review)
                 ShowJournal | less
-                return 0
+                return $?
                 ;;
             -e|e|--edit|edit)
                 edit_file=1
@@ -224,7 +236,7 @@ function main() {
                 ;;
             -h|h|--help|help)
                 Usage
-                return 0
+                return $?
                 ;;
             *vim|*nvim|*micro|*nano)
                 edit_file=1
@@ -239,7 +251,11 @@ function main() {
                 verbose=1
                 ;;
             *)
-                LOG error "Invalid flag: '$arg'"
+                if [[ -s "${arg}" ]]; then
+                    ShowJournal "${arg}"
+                    return $?
+                fi
+                LOG error "Invalid flag: '${arg}'"
                 ;;
         esac
     done
@@ -247,15 +263,15 @@ function main() {
     if [[ $edit_file -eq 1 && $edit_template -eq 1 ]]; then
         EditTemplate
         LOG info "Process completed, exiting..."
-        return 0
+        return $?
     elif [[ $edit_file -eq 0 && $edit_template -eq 1 ]]; then
         ShowTemplate
-        return 0
+        return $?
     fi
 
     if [[ $edit_file -eq 1 ]]; then
-        EditJournalFile "${Editor:-"vim"}" $verbose
-        return 0
+        EditJournalFile "${EDITOR:-"vim"}" $verbose
+        return $?
     fi
 
     if [[ ! -f "${JOURNAL_DIR}/${JOURNAL_FILE}" ]]; then

@@ -33,9 +33,11 @@ username="${light_green}\u${nc}"
 hostname="${host_color}\h${nc}"
 workingdirectory="${dir_color}\w${nc}"
 
+
+
 function show_current_branch() {
-    local blue="\033[38;2;0;200;200m"
-    local branch="$(git symbolic-ref --short HEAD 2> /dev/null)"
+    local blue="\[\033[38;2;0;200;200m\]"
+    local branch="\[$(git symbolic-ref --short HEAD 2> /dev/null)\]"
     if [[ -n "${branch}" ]]; then
         echo "${blue}(${nc}${branch_col}${branch}${nc}${blue})${nc} "
     else
@@ -48,5 +50,8 @@ function show_current_branch() {
 PROMPT_COMMAND='PS1="${opening_bracket} ${username}@${hostname}:${workingdirectory} ${closing_bracket} $ $(show_current_branch)"'
 
 source "$HOME/.cargo/env" 2> /dev/null
-source "$HOME/.shell_rc" 2> /dev/null
+if source ${HOME}/.shell_rc 2> /dev/null; then
+    SetPath
+    SSH_Agent
+fi
 

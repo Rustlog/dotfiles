@@ -22,7 +22,7 @@
 - **Yazi**: [~/.config/yazi](yazi/)
 
 ### Tree view
-[ZyrenV](https://github.com/ZyrenV/dotfiles)
+[Rustlog](https://github.com/Rustlog/dotfiles)
 ```
 ├── sway/        # Sway WM config and scripts
 ├── waybar/      # Waybar status bar config
