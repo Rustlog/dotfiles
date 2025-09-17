@@ -37,9 +37,9 @@ workingdirectory="${dir_color}\w${nc}"
 
 function show_current_branch() {
     local blue="\[\033[38;2;0;200;200m\]"
-    local branch="\[$(git symbolic-ref --short HEAD 2> /dev/null)\]"
+    local branch="$(git symbolic-ref --short HEAD 2> /dev/null)"
     if [[ -n "${branch}" ]]; then
-        echo "${blue}(${nc}${branch_col}${branch}${nc}${blue})${nc} "
+        echo "${blue}(${nc}${branch_col}\[${branch}\]${nc}${blue})${nc} "
     else
         echo ""
     fi

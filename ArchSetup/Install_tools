@@ -110,7 +110,12 @@ function Install_graphics_tools() {
 
 function Install_browsers() {
     MSG="Browsers"
-    Pacman_install "${MSG}" qutebrowser tor torbrowser-launcher
+    local -a PacmanPkgs=(
+    qutebrowser
+    tor torbrowser-launcher
+    vivaldi vivaldi-ffmpeg-codecs
+    )
+    Pacman_install "${MSG}" "${PacmanPkgs[@]}"
     AUR_Install "${MSG}" brave-bin google-chrome zen-browser
 }
 
@@ -236,10 +241,14 @@ function Install_misc_tools() {
         zettlr figlet terminator sleuthkit lshw inxi net-tools
         ufw whois wikiman dhclient darktable qemu termdown thunderbird lazygit xdot
         syslog-ng glances krusader nwg-drawer speedtest-cli kube-apiserver kubectl
-        syncplay ncurses carla qtractor rust rust-src ardour qt6-tools obsidian
-        nvidia-container-toolkit weechat irssi blender okular krita vim git
-        docker gimp wofi code python-openai-whisper perl-image-exiftool xev
+        syncplay ncurses carla qtractor rust rust-src ardour qt6-tools obsidian gtypist
+        nvidia-container-toolkit weechat irssi blender okular krita vim git yt-dlp
+        docker gimp wofi code python-openai-whisper perl-image-exiftool xev time pv
         shfmt binwalk bat eza lsd vsftpd wget curl fuzzel fastfetch stress stress-ng
+        acpid acpica
+        httrack # download website for local use
+        qbittorrent
+        veracrypt
         nginx apache
         lynx w3m
         kate bind

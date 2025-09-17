@@ -101,6 +101,10 @@ font pango: SourceCodePro Large 4
     exec --no-startup-id /usr/lib/xdg-desktop-portal-wlr &
     exec --no-startup-id /usr/lib/xdg-desktop-portal -r
 
+    # Set volume and mute mic
+    exec bash -c 'pactl set-sink-volume @DEFAULT_SINK@ 64%; pactl set-source-volume @DEFAULT_SOURCE@ 0%; pactl set-source-mute @DEFAULT_SOURCE@ true'
+
+
     # swayidle for lockscreen
     exec_always --no-startup-id swayidle -w \
             timeout 100 "${HOME}/.config/sway/lock_screen/lock.sh" \
@@ -110,7 +114,7 @@ font pango: SourceCodePro Large 4
     exec_always --no-startup-id bash -c 'ID="$(pgrep -f swayidle)"; [[ ${#ID} -le 10 ]] || echo "$ID" | grep -v "$(echo "$ID" | tail -n 2)" | xargs -x kill'
 
     exec_always --no-startup-id bash -c 'sock="${XDG_RUNTIME_DIR}/foot${WAYLAND_DISPLAY/#/-}.sock"; [[ -S "${sock}" ]] || foot --server=${sock}'
-    exec_always --no-startup-id ${HOME}/.bin/NowPlaying
+    exec_always --no-startup-id ${HOME}/.bin/sh/NowPlaying
 
 ### Window rules ###
     # Set opacity for all windows
@@ -124,8 +128,8 @@ font pango: SourceCodePro Large 4
         for_window [class=".*"] default_floating_border pixel 1
     # Transparancy levels for applications
         for_window [app_id="^(foot)$"] opacity 0.97
-        for_window [app_id="waterfox*"] opacity 1
-        for_window [class="Opera*"] opacity 1
+        for_window [app_id="waterfox*|Alacritty*|mpv*|imv*"] opacity 1
+        for_window [class="Opera*|feh*"] opacity 1
     # Any App Id with 'Floating', floating
         for_window [app_id="^(Floating|Float|floating|float)$"] floating enable, move position center
     # Enabele floating don't tile
@@ -155,7 +159,7 @@ font pango: SourceCodePro Large 4
 ### Keybindings for Containers/Workspaces/Gestures/Layout/Behaviour/Volume/Brightnes/Focus ###
 
     #* Reload the configuration file
-        bindsym $mod+Shift+c exec swaymsg reload
+        bindsym $mod+Shift+C exec swaymsg reload
 
     #* Exit sway (Kicks you out of your Wayland session) *#
         bindsym $mod+Shift+E exec swaymsg exit
@@ -216,6 +220,7 @@ font pango: SourceCodePro Large 4
             bindsym $mod+Ctrl+Left      exec playerctl position $( awk '{ print $1 - (5)  }' <<< $(playerctl position) )
             bindsym $mod+Left           exec playerctl position $( awk '{ print $1 - (10) }' <<< $(playerctl position) )
             bindsym $mod+Shift+Left     exec playerctl position $( awk '{ print $1 - (40) }' <<< $(playerctl position) )
+
         # Seek forward
             bindsym $mod+Ctrl+Right     exec playerctl position $( awk '{ print $1 + (5)  }' <<< $(playerctl position) )
             bindsym $mod+Right          exec playerctl position $( awk '{ print $1 + (10) }' <<< $(playerctl position) )
@@ -334,9 +339,7 @@ font pango: SourceCodePro Large 4
 
         # Bring my Text-fu terminal
             bindsym $mod+Return exec footclient
-            bindsym $mod+Shift+Return exec footclient bash -c \
-                'tmux attach-session 2> /dev/null || tmux new-session -t dev'
-            bindsym $mod+Alt+Return exec alacritty
+            bindsym $mod+Shift+Return exec alacritty
 
         # Good File Managers
             bindsym Alt+E exec env XDG_CURRENT_DESKTOP=kde QT_QPA_PLATFORMTHEME=qt6ct dolphin
@@ -355,10 +358,12 @@ font pango: SourceCodePro Large 4
         #$ Screen Recording $#
             # Start recording fullscreen! (Mod+Alt+V)
                 bindsym $mod+Alt+V exec bash -c \
-                    '$(DIR="${HOME}/WF_Recorder"; [[ ! -d "${DIR}" ]] && mkdir -p "${DIR}"; pidof wf-recorder > /dev/null || wf-recorder --pixel-format=yuv420p --codec=h264_nvenc -p preset=fast --framerate=40 --audio="$(pactl get-default-sink).monitor" --file="${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv")'
-            # Start recording on selected ratio of the screen (Mod+Alt+B)
-                bindsym $mod+Alt+B exec bash -c \
-                    '$(DIR="${HOME}/WF_Recorder"; [[ ! -d "${DIR}" ]] && mkdir -p "${DIR}"; pidof wf-recorder > /dev/null || wf-recorder --pixel-format=yuv420p --codec=h264_nvenc -p preset=fast --framerate=40 --audio="$(pactl get-default-sink).monitor" -g "$(slurp)" --file="${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv")'
+                    'DIR="${HOME}/WF_Recorder"; [[ ! -d "${DIR}" ]] && mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null || declare -a flags=("--pixel-format=yuv420p" "--framerate=60" --audio="$(pactl get-default-sink).monitor" "--file="${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv""); wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast || wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast'
+
+            # Start recording on selected ratio of the screen (Mod+Shift+V)
+                bindsym $mod+Shift+V exec bash -c \
+                    'DIR="${HOME}/WF_Recorder"; [[ ! -d "${DIR}" ]] && mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null || declare -a flags=("--pixel-format=yuv420p" "--framerate=60" --audio="$(pactl get-default-sink).monitor" "-g" "$(slurp)" "--file="${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv""); wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast || wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast'
+
             # Stop recording send INT sig to the recorder (Mod+Alt+C)
                 bindsym $mod+Alt+C exec bash -c \
                     '$(kill -INT $(pidof wf-recorder))'
@@ -402,7 +407,7 @@ font pango: SourceCodePro Large 4
 
         # What's my selected screen resolution? (Mod+Shift+G)
             bindsym $mod+Shift+G exec bash -c \
-                '$(Res="$(slurp)" && notify-send -t 10000 "${Res}")'
+                '$(Res="$(slurp)" && notify-send -t 8000 "${Res}")'
 
         # List of Emojies in rofi-emoji (backslash+E)
             bindsym $mod+grave+V exec bash -c \
@@ -427,7 +432,8 @@ font pango: SourceCodePro Large 4
 
     #* Scripts *#
         # An application launcher
-            bindsym Shift+F10 exec bash -c 'FILE="${HOME}/.config/sway/waybar/toggle_theme.sh"; pgrep -f "${FILE}" || "${FILE}"; pkill -x waybar; pkill -SIGUSR1 -f ${FILE}'
+            bindsym Shift+F10 exec bash -c \
+                'FILE="${HOME}/.config/sway/waybar/toggle_theme.sh"; pgrep -f "${FILE}" || "${FILE}"; pkill -x waybar; pkill -SIGUSR1 -f ${FILE}; ${HOME}/.bin/sh/NowPlaying'
             bindsym $mod+F10 exec pkill -f "toggle_theme.sh"; pkill -f '.*bin/waybar'
 
         # Create cava windows to look cool
@@ -438,7 +444,7 @@ font pango: SourceCodePro Large 4
             bindsym $mod+grave+G exec bash -c \
                '${HOME}/.exec_me'
 
-        # Journal time: Let's document the mess
+        # Journal time
             bindsym $mod+grave+J exec bash -c \
                 '$(foot -e env EDITOR=nvim ${HOME}/.bin/JournalToday edit)'
 

@@ -224,7 +224,7 @@ function main() {
 
     mpv_flags+=(
         "--vid=${video:-"no"}"
-        "--volume=${volume:-95}"
+        "--volume=${volume:-94}"
     )
 
     mpv_flags+=(
@@ -245,10 +245,11 @@ function main() {
     fi
     mpv_flags+=(
         "--hwdec=vulkan"
+        "--gpu-api=vulkan"
         "--hdr-compute-peak"
         "--loop-playlist=inf"
-        "--really-quiet"
         "--msg-level=ffmpeg/demuxer=error"
+        "--really-quiet"
     )
 
     [[ "${QUIET}" -eq 1 ]] && mpv_flags+=("--really-quiet")

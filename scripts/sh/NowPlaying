@@ -1,32 +1,39 @@
 #!/usr/bin/env bash
 
-trap 'Exit' SIGINT SIGTERM
-
 SCRIPT_PATH="$(realpath "$0")"
 CURRENT_PID=$$
 LOGGING=${1:-0}
 
 pgrep -f "${SCRIPT_PATH}" | grep -v "^${CURRENT_PID}$" | xargs -r kill
 
-MPV_SOCKET="/tmp/.mpv_socket"
-isPlaying=0
-title=""
-artist=""
-album=""
-combined=""
+SOCKET="/tmp/.now_playing_socket"
+LOG_FILE="/tmp/.now_playing_socket.log"
 
 function log() {
-    [[ $LOGGING == 1 ]] && printf '%s\n' "$*"
+    if [[ $LOGGING -eq 1 ]]; then
+        printf '%b\n' "$*" 1>&2 # Send log to stderr
+        printf '%b\n' "$*" &>> "${LOG_FILE}"
+    fi
 }
 
 function Exit() {
-    printf "\n"
-    printf "%b" "Exiting... Bye!\n"
-    exit 0
+    local -i pid=$1
+    if [[ -n "$pid" && "$pid" != "0" ]]; then
+        kill -SIGTERM $pid && log "Killed pid '$pid'" || log "Failed to kill pid '$pid'"
+    fi
+    log "\nExiting... Bye!\n"
+    exit $?
 }
 
 function CheckPlay() {
-    PLAYERS=($(playerctl --list-all | tr '\n' ' '))
+    local -i isPlaying=0
+    local title=""
+    local artist=""
+    local album=""
+    local combined=""
+
+    PLAYERS=($(playerctl --list-all | tr '\n' ' ' 2> /dev/null))
+
     for player in "${PLAYERS[@]:-""}"; do
         status_="$(playerctl --player="${player}" status 2>/dev/null)"
         if [[ "${status_}" == "Playing" ]]; then
@@ -37,9 +44,9 @@ function CheckPlay() {
 
             if [[ "${player}" == "spotify" ]]; then
                 if [[ "${title}" == "Advertisement" ]]; then
-                    pactl set-sink-mute $(pactl get-default-sink) true
+                    pactl set-sink-mute @DEFAULT_SINK@ true
                 else
-                    pactl set-sink-mute $(pactl get-default-sink) false
+                    pactl set-sink-mute @DEFAULT_SINK@ false
                 fi
             fi
 
@@ -59,24 +66,41 @@ function CheckPlay() {
                 -e 's/\t/\\t/g' \
                 -e 's/\r/\\r/g' \
                 -e 's/\n/\\n/g' \
-                -e 's/\f/\\f/g')"
+                -e 's/\f/\\f/g'
+            )"
 
             log "You are playing: ${combined}"
-            echo "{\"text\": \"${combined}\", \"class\": \"active\"}" | socat - UNIX-CONNECT:"${MPV_SOCKET}"
+            echo "{\"text\": \"${combined}\", \"class\": \"active\"}" | socat - UNIX-CONNECT:"${SOCKET}"
             isPlaying=1
             break
         else
             isPlaying=0
         fi
     done
-}
 
-while true; do
-    CheckPlay
     [[ $isPlaying -eq 0 ]] && {
         log "You are not playing anything"
-        echo '{"text": "", "class": "inactive"}' | socat - UNIX-CONNECT:"${MPV_SOCKET}"
+        echo '{"text": "", "class": "inactive"}' | socat - UNIX-CONNECT:"${SOCKET}"
     }
-    sleep 0.3
-done
+}
+
+function NowPlaying_Output() {
+    rm -f "${SOCKET}" &> /dev/null
+    while read -r line; do
+        echo "${line}"
+    done < <(socat -u UNIX-LISTEN:"${SOCKET}",fork -)
+}
+
+function main() {
+    NowPlaying_Output &
+    local -i now_playing_pid=$!
+    [[ -z "$now_playing_pid" ]] && return 1 || true
+    trap 'Exit $now_playing_pid' EXIT SIGINT SIGTERM
+    while true; do
+        CheckPlay
+        sleep 0.3
+    done
+}
+
+main "${@}"
 

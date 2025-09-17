@@ -109,7 +109,7 @@ function ValidatePaths() {
     for pair in "${indexed_array[@]}"; do
         IFS=$'|' read -r src dest <<< "${pair}"
         if [[ ! -e "${src}" ]]; then
-            ERROR "Invalid path: $src"
+            ERROR "Invalid file path: $src"
             valid=1
         fi
     done
@@ -122,7 +122,7 @@ function ValidateDirPaths() {
     for pair in "${indexed_array[@]}"; do
         IFS=$'|' read -r src dest recursive_flag <<< "${pair}"
         if [[ ! -e "${src}" ]]; then
-            ERROR "Invalid path: ${src}"
+            ERROR "Invalid directory path: ${src}"
             valid=1
         elif [[ -z $recursive_flag ]]; then
             ERROR "Recursive flag not given to '$(ColorPath "${pair}")'"
@@ -174,7 +174,7 @@ function CopyFiles() {
     elif [[ "$SYNC_" == "cp" ]]; then
         [[ $LOG_LEVEL -ge 2 ]] && cmd_flags+=( "--verbose" )
         cmd_flags+=( "--archive" )
-        cmd_flags+=( "--recursive" "--no-target-directory"  )
+        cmd_flags+=( "--recursive" )
     fi
 
     if $SYNC_ "${cmd_flags[@]}" "${src_}" "${dest_}"; then
@@ -458,7 +458,7 @@ function main() {
     # Start copying all the files to the destination
     for pair in "${FILES_TO_COPY[@]}"; do
         IFS=$'|' read -r src dest <<< "${pair}"
-        CopyFiles "$src" "$dest"
+        CopyFiles "${src}" "${dest}"
     done
 
     # Start copying directory content with selective deletion

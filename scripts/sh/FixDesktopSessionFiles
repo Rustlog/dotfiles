@@ -37,7 +37,7 @@ Type=Application
 Keywords=tiling;wayland;compositor;sway;
 
 EOF
-    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
+    sudo sed -i 's/    //g' "${desktop_file}" &
 }
 
 function Wayland_hyprland_desktop() {
@@ -54,7 +54,7 @@ Type=Application
 Keywords=tiling;wayland;compositor;hyprland;
 
 EOF
-    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
+    sudo sed -i 's/    //g' "${desktop_file}" &
 }
 
 function Wayland_plasma_desktop() {
@@ -69,7 +69,7 @@ TryExec=/usr/bin/startplasma-wayland
 Keywords=plasma;kde;
 
 EOF
-    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
+    sudo sed -i 's/    //g' "${desktop_file}" &
 }
 
 function Wayland_gnome_desktop() {
@@ -86,7 +86,7 @@ X-GDM-SessionRegisters=true
 X-GDM-CanRunHeadless=true
 
 EOF
-    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
+    sudo sed -i 's/    //g' "${desktop_file}" &
 }
 
 function X11_i3_desktop() {
@@ -103,7 +103,7 @@ X-LightDM-DesktopName=i3
 Keywords=tiling;wm;windowmanager;window;manager;
 
 EOF
-    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
+    sudo sed -i 's/    //g' "${desktop_file}" &
 }
 
 function X11_gnome_desktop() {
@@ -120,7 +120,7 @@ X-GDM-SessionRegisters=true
 X-GDM-CanRunHeadless=true
 
 EOF
-    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
+    sudo sed -i 's/    //g' "${desktop_file}" &
 }
 
 function X11_plasma_desktop() {
@@ -136,7 +136,7 @@ Comment=Plasma by KDE
 X-KDE-PluginInfo-Version=6.3.1
 
 EOF
-    vim -c ':%s/    //g' -c ':wq' "${desktop_file}" &> /dev/null &
+    sudo sed -i 's/    //g' "${desktop_file}" &
 }
 
 function RestoreWaylandDesktopFiles() {

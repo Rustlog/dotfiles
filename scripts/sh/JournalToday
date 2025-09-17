@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 
-# trap can't save your ass from SIGKILL
-trap Cleanup SIGTERM SIGINT
+set -eo pipefail
 
-### Edit these vairables to their correct values
+# trap can't save you from SIGKILL
+trap Cleanup SIGTERM SIGINT
 
 ### Journal directory (All your journal's will be here)
 JOURNAL_DIR="${HOME}/journalD"
 ### tr TRANSFORM_KEY file
 TRANSFORM_KEY="${HOME}/.custom/encryption_keys/$(basename "$0")"
-### Any existing template you want
+### A ready-made template for daily journal
 TEMPLATE="${JOURNAL_DIR}/.template"
-### Line of text after and including from the template will be part of journal template
+### Journal file name
 JOURNAL_FILE="$(date +%d-%b-%Y_).md"
 ### Unique temp file for plain text editing
 TEMP_FILE=""
 
+### Pretty colors
 RED="\033[38;2;159;29;75m"
 GREEN="\033[38;2;108;176;97m"
 BLUE="\033[38;2;103;128;229m"
@@ -23,6 +24,7 @@ LIGHT_GREEN="\033[38;2;115;202;97m"
 MUDDY="\033[38;2;181;191;121m"
 NC="\033[0m"
 
+### Logging system
 function LOG() {
     type_="$1"
     shift
@@ -36,10 +38,12 @@ function LOG() {
     esac
 }
 
+### Replace exposed ${HOME} to litral \${HOME} with blue color
 function ColorPath() {
     echo "$( sed "s@${HOME}@${BLUE//\\/\\\\}\${HOME}${NC//\\/\\\\}@g" <(printf "%s\n" "${1}") )"
 }
 
+### Generate a new key for
 function CreateNewKey() {
     local -r NEW_KEY="$(printf "%s -> %s\n" "$(echo {{A..Z},{a..z}} | tr ' ' '\n' | shuf | tr -d '\n' )" "$(echo {{A..Z},{a..z}} | tr -d ' ')")"
     if [[ -n "${NEW_KEY}" ]]; then
@@ -94,12 +98,13 @@ function ShowJournal() {
 }
 
 function ShowTemplate() {
-    LOG info "From file: ${JOURNAL_DIR}/${JOURNAL_FILE}\n"
+    local template="$1"
+    echo && LOG info "Template: $(ColorPath "${template}")\n"
     if command -v bat &> /dev/null; then
         bat --language=md --paging=never --decorations=never --color=always \
-            "${TEMPLATE}"
+            "${template}"
     else
-        cat "${TEMPLATE}"
+        cat "${template}"
     fi
     LOG info "Process completed, exiting..."
 }
@@ -171,15 +176,15 @@ function Usage() {
         " ${MUDDY}Options:${NC}" \
         "   ${GREEN}-s, --show, --view${NC}     Show today's journal (with decryption)" \
         "   ${GREEN}-e, --edit${NC}             Edit today's journal using default (vim)" \
-        "   ${GREEN}-t, --template${NC}         Edit the journal template" \
-        "   ${GREEN}-r, --review${NC}           (Reserved) Review mode, no-op for now" \
+        "   ${GREEN}-t, --edit-template${NC}    Edit the journal template" \
+        "   ${GREEN}-r, --review${NC}           Intaractive Review mode" \
         "" \
         " ${MUDDY}Editor (used alone):${NC}" \
         "   ${GREEN}vim | nvim | nano | micro${NC}   Launch and edit today's journal using the specified editor" \
         "" \
         " ${MUDDY}Examples:${NC}" \
         "   ${GREEN}JournalToday --edit${NC}         # Edit with default editor (vim)" \
-        "   ${GREEN}JournalToday micro${NC}          # Edit using micro editor" \
+        "   ${GREEN}JournalToday nvim${NC}           # Edit using neovim editor" \
         "   ${GREEN}JournalToday --template${NC}     # Modify the template file" \
         "   ${GREEN}JournalToday --show${NC}         # View today's decrypted journal" \
         "" \
@@ -193,7 +198,9 @@ function main() {
     local -i edit_file=0
     local -i edit_template=0
     local -i verbose=0
+    local -i show_template=0
     local Editor=""
+    local next_arg=""
 
     mkdir -p "$(dirname "${TRANSFORM_KEY}")"
 
@@ -219,22 +226,30 @@ function main() {
 
     ### Parse arguments
     for arg in "${ARGS[@]}"; do
-        case "$arg" in
-            -s|s|--show|show|--view|view)
+        case "${arg}" in
+            -*show*jour*|show*jour*|-*show|show)
+                next_arg="${ARGS[$((i+1))]}"
+                if [[ -s "${next_arg}" ]]; then
+                    ShowJournal "${next_arg}"
+                    return $?
+                fi
                 ShowJournal
                 return $?
                 ;;
-            -r|r|--review|review)
+            -*review*|review*)
                 ShowJournal | less
                 return $?
                 ;;
-            -e|e|--edit|edit)
+            -e|-*edit|edit*)
                 edit_file=1
                 ;;
-            -t|t|--template|template)
+            -t|-*edit*template|*edit*template*)
                 edit_template=1
                 ;;
-            -h|h|--help|help)
+            -*show*template|*show*template*)
+                show_template=1
+                ;;
+            -h|--help|help*)
                 Usage
                 return $?
                 ;;
@@ -247,7 +262,7 @@ function main() {
                     Editor="$arg"
                 fi
                 ;;
-            -v|--verbose)
+            -v|-*verbose)
                 verbose=1
                 ;;
             *)
@@ -260,17 +275,17 @@ function main() {
         esac
     done
 
-    if [[ $edit_file -eq 1 && $edit_template -eq 1 ]]; then
-        EditTemplate
-        LOG info "Process completed, exiting..."
-        return $?
-    elif [[ $edit_file -eq 0 && $edit_template -eq 1 ]]; then
-        ShowTemplate
+    if [[ $edit_file -eq 1 ]]; then
+        EditJournalFile "${EDITOR:-"vim"}" $verbose
         return $?
     fi
 
-    if [[ $edit_file -eq 1 ]]; then
-        EditJournalFile "${EDITOR:-"vim"}" $verbose
+    if [[ $edit_template -eq 1 ]]; then
+        EditTemplate
+        LOG info "Process completed, exiting..."
+        return $?
+    elif [[ $show_template -eq 1 ]]; then
+        ShowTemplate "${TEMPLATE}"
         return $?
     fi
 

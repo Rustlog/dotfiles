@@ -35,6 +35,8 @@ c.url.searchengines = {
 
 # save tabs on quit/restart
 c.auto_save.session = True
+# Private browsing
+c.content.private_browsing = True
 
 c.completion.open_categories = ['searchengines', 'quickmarks', 'bookmarks', 'history', 'filesystem']
 

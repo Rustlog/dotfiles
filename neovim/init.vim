@@ -122,7 +122,7 @@ command! ToggleWrap :call ToggleWrap()
 command! InstallPlug call InstallPlug()
 
 " Abort the commit message
-command! GitAbort :!rm -f % | :q!
+command! GitAbort : !mv "%" "%.bak" | :q!
 
 let mapleader = '\'
 
@@ -130,7 +130,7 @@ let g:vimspector_enable_mappings = 'HUMAN'
 
 " Automatically jump to the last cursor position when reopening a file
 autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") | exe "normal! g`\" | zz" | endif
-autocmd BufRead,BufNewFile *.conf set filetype=dosini
+" autocmd BufRead,BufNewFile *.conf set filetype=dosini
 
 " C tmeplate
 autocmd BufNewFile *.c call setline(1, ["# include <stdio.h>", "", "# define EXIT_SUCCESS 0", "# define EXIT_FAILURE 1", "", "int main(void) {", "    printf(\"\\n\");", "    return EXIT_SUCCESS;", "}", ""])

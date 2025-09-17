@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # vim:filetype=bash
 
-
 THIS_FILE="$0"
 
 RED="\033[38;2;244;10;10m"
@@ -56,7 +55,7 @@ export EDITOR="nvim"
 export BREW="/home/linuxbrew/.linuxbrew"
 export PATH="/usr/bin"
 export MEDIA="/run/media/$USER"
-export XDG_DATA_HOME="$HOME/local/share"
+export XDG_DATA_HOME="$HOME/.local/share"
 export HOME="${HOME:-"$(echo ~)"}"
 
 # Ls/Directory listing commands alias
@@ -120,7 +119,6 @@ alias qemu="qemu-system-x86_64"
 alias sway="env WLR_RENDERER=vulkan sway"
 alias VimBeGood="clear; docker run -it --rm brandoncc/vim-be-good:stable && echo && clear"
 alias gtypistH="gtypist --personal-best --max-error=1.8 --no-welcome-screen --term-cursor --word-processor --always-sure"
-alias mpv="mpv --vid=auto --vo=gpu-next --hwdec=vulkan --hdr-compute-peak --volume=64"
 alias qutebrowser="QT_QPA_PLATFORM=xcb QT_WEBENGINE_DISABLE_GPU=1 qutebrowser"
 alias colorchoser="env QT_QPA_PLATFORMTHEME=qt6ct kcolorchooser 2> /dev/null & disown"
 alias getcolors="env QT_QPA_PLATFORMTHEME=qt6ct kcolorchooser 2> /dev/null & disown"
@@ -155,7 +153,7 @@ unset _FP_RUN
 
 # Utility aliases
 alias NULL="/dev/null"
-alias clear="reset"
+alias clear="tput clear"
 
 # Typo/alternative language aliases
 alias сдуфк="clear"
@@ -337,13 +335,14 @@ function Tor() {
     u_set="${1:-"NULL"}"
 
     set_var() {
+        export HTTP_PROXY="socks5://127.0.0.1:9050"
+        export HTTPS_PROXY="socks5://127.0.0.1:9050"
         export http_proxy="socks5://127.0.0.1:9050"
         export https_proxy="socks5://127.0.0.1:9050"
     }
 
     unset_var() {
-        unset http_proxy
-        unset https_proxy
+        unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
     }
 
     case "${arg}" in
@@ -720,7 +719,7 @@ function sway_vulkan() {
 ### Set the path with default locations
 function SetPath() {
     PATH+=: PATH+="/usr/sbin:/sbin:/bin:/usr/local/bin:/usr/local/sbin"
-    PATH+=: PATH+="${HOME}/.bin:${HOME}/.local/bin"
+    PATH+=: PATH+="${HOME}/.bin/main:${HOME}/.bin/sh:${HOME}/.local/bin"
     PATH+=: PATH+="${HOME}/.cargo/bin:${HOME}/.npm_global/bin:${BREW}/bin"
 
     local tmp_path="/tmp/.home.path"
@@ -934,24 +933,13 @@ function grammer_check() {
     '
 }
 
-### Terminal file explorer with cd tracking
-function y() {
-    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd=
-    yazi "$@" --cwd-file="${tmp}"
-    if cwd="$(command cat -- "${tmp}")" && [[ -n "${cwd}" && "${cwd}" != "${PWD}" ]]; then
-        builtin cd -- "${cwd}"
-    fi
-    rm -f -- "${tmp}"
-}
-
 # sysstat: lightweight stats (net + disk)
 sysstat() {
-    local iface="${1:-wlo1}"      # network iface (default wlo1)
-    local dev="${2:-nvme0n1}"     # block device (default nvme0n1)
-    local interval="${3:-1}"      # interval seconds
-    local iterations="${4:-1}"    # how many iterations (default 1, -1=infinite)
+    local iface="${1:-$(ip route | grep default | awk '{print $5}')}"
+    local dev="${2:-nvme0n1}"
+    local interval="${3:-1}"
+    local iterations="${4:-1}"
 
-    # --- paths ---
     local rx_path="/sys/class/net/$iface/statistics/rx_bytes"
     local tx_path="/sys/class/net/$iface/statistics/tx_bytes"
     local stat_path="/sys/block/$dev/stat"
@@ -960,7 +948,6 @@ sysstat() {
     [[ ! -e $rx_path ]] && { echo "No such iface: $iface"; return 1; }
     [[ ! -e $stat_path ]] && { echo "No such block dev: $dev"; return 1; }
 
-    # --- helpers ---
     human() {
         local bytes=$1
         if (( bytes > 1073741824 )); then
@@ -992,10 +979,16 @@ sysstat() {
         local rx=$(<"$rx_path") tx=$(<"$tx_path")
         read -r rd wr < <(get_disk_bytes)
 
-        echo "Total Download: $(human $rx)"
-        echo "Total Upload:   $(human $tx)"
-        echo "Disk Read:      $(human $rd)"
-        echo "Disk Write:     $(human $wr)"
+        printf '%s\n' ""
+        printf '%s:\n' "Network"
+        printf '    %-4s: %s\n' "Total Download" "$(human $rx)"
+        printf '    %-4s: %s\n' "Total Upload"   "$(human $tx)"
+        printf '    %-4s: %s\n' "Total Net"      "$(human $((rx+tx)))"
+        printf '%s\n' ""
+        printf '%s:\n' "Disk I/O"
+        printf '    %-4s: %s\n' "Disk Read"      "$(human $rd)"
+        printf '    %-4s: %s\n' "Disk Write"     "$(human $wr)"
+        printf '%s\n' ""
         return 0
     fi
 
@@ -1029,15 +1022,16 @@ sysstat() {
 }
 
 ### Terminal file explorer with cd tracking
-function yc() {
-    clear
-    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd=
+function y() {
+    local tmp="$(mktemp -t "yazi-cwd.XXX")"
+    local cwd=""
     yazi "$@" --cwd-file="${tmp}"
-    if cwd="$(command cat -- "${tmp}")" && [[ -n "${cwd}" && "${cwd}" != "${PWD}" ]]; then
+    cwd="$(command cat -- "${tmp}")"
+    if [[ -n "${cwd}" && "${cwd}" != "${PWD}" ]]; then
         builtin cd -- "${cwd}"
     fi
     rm -f -- "${tmp}"
-}
+}; alias yc="clear; y"
 
 ### Remove Unnecessary characters from given string
 function Pretty() {
@@ -1106,7 +1100,7 @@ function SetPower() {
                 --vrmsoc-current=$((15*t)) \
                 --vrmmax-current=$((110*t)) \
                 --vrmsocmax-current=$((20*t)) \
-                --tctl-temp=85 \
+                --tctl-temp=$core_temp \
                 --apu-skin-temp=$((42*t)) \
                 --dgpu-skin-temp=$((51*t)) 2> /dev/null
             return 0
@@ -1117,14 +1111,14 @@ function SetPower() {
             return 0
             ;;
         *)
-            LOG info "Usage: ${FUNCNAME:-"${funcstack}"} [verylow|low|balanced|high|boost|stock]"
+            LOG info "Usage: ${FUNCNAME[0]:-"${funcstack[0]}"} [verylow|low|balanced|high|boost|stock]"
             return 1
             ;;
     esac
     sudo ryzenadj --stapm-limit=$stapm --fast-limit=$fast --slow-limit=$slow --apu-slow-limit=$apuslow --tctl-temp=$core_temp 2> /dev/null
 }
 
-function browser() {
+function waterfox_dev() {
     local firefox_profile_name="$1"
     local firefox_profile_dir="${HOME}/.profiles"
     local profile="" browser=""
@@ -1218,7 +1212,19 @@ function Ip() {
 
 ### Update grub
 function update-grub() {
-    sudo grub-mkconfig -o /boot/grub/grub.cfg
+    local grub_config="/boot/grub/grub.cfg"
+    sudo -v
+    run_cmd() {
+        local -a cmd=("${@}")
+        LOG info "${cmd[*]}"
+        "${cmd[@]}" # Run the command list
+    }
+    if [[ -f "${grub_config}.bak" ]]; then
+        run_cmd sudo cp "${grub_config}" "${grub_config}_$(date +%d-%b-%Y-%T_%p).bak"
+    else
+        run_cmd sudo cp "${grub_config}" "${grub_config}.bak"
+    fi
+    run_cmd sudo grub-mkconfig -o "${grub_config}"
 }
 
 ### Run neovim with sudo
@@ -1236,6 +1242,70 @@ function Sort() {
     du -sh "${total_args[@]}" | /usr/bin/sort --numeric-sort
 }
 
+function mpv_vulkan() {
+    [[ -n $ZSH_VERSION ]] && emulate -LR bash
+    local -a args=("${@}")
+    local -a file_items=()
+    local -a dir_items=() all_dir_items=()
+    local -a dirs_=()
+    local -a files=()
+    local -a cmd_flags=()
+    local -a cmd_args=()
+
+    # Separate files, directories, other options
+    for arg in "${args[@]}"; do
+        if [[ -f "${arg}" ]]; then
+            files+=("${arg}")
+        elif [[ -d "${arg}" ]]; then
+            dirs_+=("${arg}")
+        else
+            cmd_args+="${arg}"
+        fi
+    done
+
+    # if there are files use them directly
+    if [[ "${#files[@]}" -gt 0 ]]; then
+        file_items=("${files[@]}")
+    fi
+
+    # if there are directories select files interactively
+    if [[ "${#dirs_[@]}" -gt 0 ]]; then
+        for ((i=0; i<${#dirs_[@]};i++)); do
+            dir="${dirs_[$i]}"
+            cd "${dir}"
+            if [[ -n $BASH_VERSION ]]; then
+                mapfile -t dir_items < <(fzf --multi)
+            elif [[ -n $ZSH_VERSION ]]; then
+                dir_items=("${(@f)"$(fzf --multi)"}")
+            fi
+            dir_items=("${dir_items[@]/#/${dir}/}")
+            all_dir_items+=("${dir_items[@]}")
+            cd - &> /dev/null
+        done
+    fi
+
+    # Prepare command line flags for mpv
+    local -a cmd_flags=(
+        "--vid=auto"
+        "--audio=auto"
+        "--audio-device=pulse"
+        "--volume=94"
+        "--osc=no"
+        "--fullscreen"
+        "--scale=ewa_lanczos4sharpest"
+        "--script-opts=mpris=yes"
+        "--vo=gpu-next"
+        "--hwdec=vulkan"
+        "--gpu-api=vulkan"
+        "--hdr-compute-peak"
+        "--loop-playlist=inf"
+        "--msg-level=ffmpeg/demuxer=error"
+        "--really-quiet"
+    )
+    # Execute the command with necessary flags and files
+    /usr/bin/mpv "${cmd_flags[@]}" "${cmd_args[@]}" "${file_items[@]}" "${all_dir_items[@]}"
+}
+
 function ToggleDrivers() {
     local -a args=("$@")
 
@@ -1243,7 +1313,7 @@ function ToggleDrivers() {
         local module="$1"
         local device="$2"
         [[ $# -ne 2 ]] && return 1
-        if lsmod | grep -q "^${module}"; then
+        if lsmod | /usr/bin/grep -q "^${module}"; then
             sudo modprobe -r "${module}" && LOG info "Disabled ${device}"
         else
             sudo modprobe "${module}" && LOG info "Enabled ${device}"
@@ -1256,7 +1326,7 @@ function ToggleDrivers() {
                 toggle_driver_ "uvcvideo" "Camera"
             ;;
             [Gg][Pp][Ss]*) # gps
-                toggle_driver_ "uvcvideo" "Gps"
+                toggle_driver_ "" "Gps"
             ;;
         esac
     done
@@ -1284,13 +1354,13 @@ function nvidia() {
     fi
 
     if ls -l "${binary[*]}" &> /dev/null; then
-        printf '[INFO]: %s: ./%s' "Running from current directory" "${binary[*]}"
+        printf '[INFO]: %s: ./%s\n' "Running from current directory" "${binary[*]}"
         binary=("./${binary[*]}")
     elif command -v "${binary}" &> /dev/null; then
-        printf '[INFO]: %s: %s' "Running from PATH" "$(which "${binary[*]}")"
+        printf '[INFO]: %s: %s\n' "Running from PATH" "$(which "${binary[*]}")"
         binary=("${binary[*]}")
     else
-        printf '[ERROR]: %s; %s\n' "${binary[*]}" "No such file or binary?"
+        printf '[ERROR]: "%s"; %s\n' "${binary[*]}" "No such file or binary?"
         return 1
     fi
 
@@ -1310,7 +1380,7 @@ function nvidia() {
         MANGOHUD=${mangohud_enabled}
     )
     # Run executable
-    exec env "${environment_variables[@]}" "${binary[*]}" "${args[@]}"
+    env "${environment_variables[@]}" "${binary[*]}" "${args[@]}"
 }; alias nvrun="nvidia"
 
 ### Man but cool man
