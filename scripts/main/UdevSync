@@ -2,7 +2,7 @@
 
 # A utility to backup your local files and directories to pluggable device (likely USB flash drive or any hotpluggable storage device) using udev rules
 
-set -euo pipefail
+builtin set -euo pipefail
 
 function log() {
     local type_="${1}"
@@ -13,20 +13,29 @@ function log() {
 
 function Usage() {
     local scriptName="${0##*/}"
-    local script_install_path="${1}"
+    local script_install_path="${1:-"/opt/bin/*"}"
     cat << EOF
+
 Usage: ${scriptName} [OPTIONS]
 
 OPTIONS:
-    edit, --config          Edit the main config file (~/.custom/${scriptName}/config)
-    gen-udev-rule, --rule   [--uuid=UUID]
+    edit, config            Edit the main config file (~/.custom/${scriptName}/config)
+    install rule, install rule uuid=UUID
                             Generate udev rule only for the device UUID (run \`lsblk -o NAME,LABEL,FSTYPE,UUID\` to find it)
-    install                 Install the backup script (${script_install_path}), setup udev rules and systemd service file (requires root)
-    update_script           Update the backup script (${script_install_path}) only
+    install all             Install script (${script_install_path}), udev rules and systemd service (requires root)
+    install script          Install script at (${script_install_path}) (requires root)
+    install rule            Install udev rule at (/etc/udev/rules.d/*) (requires root)
+    install service         Install systemd service at (/etc/systemd/system/*) (requires root)
+    update_script           Update the sync script (${script_install_path}) only
     help, -h                Show this help
 
-If no options, it will attempt to source config and install if ready.
 EOF
+}
+
+function GenUdevRuleHelp() {
+    log info "Identify your device's partition UUID:"
+    lsblk -o NAME,LABEL,FSTYPE,UUID | grep -v '^NAME'
+    log info "Then use: ${0##*/} rule uuid=<UUID>"
 }
 
 function DependencyChecks() {
@@ -42,11 +51,6 @@ function DependencyChecks() {
             exit 1
         fi
     done
-}
-
-function UpdateConfigVars() {
-    local -n update=$1
-    sed -i "s@.*${update[0]}.*@${update[0]}=${update[1]}@"
 }
 
 function CheckLogs() {
@@ -76,7 +80,7 @@ function FollowLog() {
 function ShowServiceStatus() {
     local service_name="${1}"
     declare -a services=()
-    services=($(systemctl list-units --type=service --output=json "${service_name}@*" | jq '.[].unit' ))
+    mapfile -t services < <(systemctl list-units --type=service --output=json "${service_name}@*" | jq '.[].unit')
     for service in "${services[@]}"; do
         service="${service//\"/}"
         log info "Status of service unit '${service}'"
@@ -84,7 +88,7 @@ function ShowServiceStatus() {
     done
 }
 
-function WriteNewConfig() {
+function CreateNewUserConfig() {
     local config_file="${1}"
     if [[ -f "${config_file}" ]]; then
         log info "config already exist, moving it '${config_file}' -> '${config_file}.bak'"
@@ -95,7 +99,7 @@ function WriteNewConfig() {
 
 # Specified directory will be served as root directory for backups
 # if value set to 'backup', then all your 'dest' items will be under '/backup' in your pluggable media.
-ROOT_DIR="backup"
+ROOT_DIR="\$(cat /etc/hostname | tr 'A-Za-z' 'a-za-z')_sync"
 
 # Create backup from Src to dest (format: "<src>|<dest>")
 # Examples:
@@ -104,6 +108,11 @@ ROOT_DIR="backup"
 ITEMS=(
     "<src>|<dest>"
 )
+
+# Any pattern matching file or directory from root directory will be removed from root directory
+# Example '*.git|*.gitignore|*.foo|*.bar'
+# Be careful with this
+REMOVE_PATTERN=""
 
 # Your pluggable device's partition UUID (get it by: 'lsblk -o NAME,LABEL,FSTYPE,UUID')
 PARTITION_UUID=""
@@ -116,7 +125,7 @@ UDEV_RULE_NAME="99-usb_backup"
 SYSTEMD_SERVICE_NAME="udev-sync"
 
 # Archive the backup if set to 1 (uses tar or compressed variants)
-# Set 0 to skip archival (uses plain cp -r)
+# Set 0 to skip archival (uses plain cp -LTvr)
 SHOULD_ARCHIVE=0
 
 # Only valid if SHOULD_ARCHIVE set to 1
@@ -130,59 +139,42 @@ ARCHIVE_FORMAT="tar"
 EOF
 }
 
-function WriteSystemdSerivce() {
-    local service_name="${1}"
-    local script_path="${2}"
-
-    local write=(sudo tee)
-    local service_dir="/etc/systemd/system"
-    local systemd_service_file="${service_dir}/${service_name}@.service"
-    sudo -v
-    sudo mkdir -p "${service_dir}"
-    log info "Installing custom systemd service '${systemd_service_file}'"
-    "${write[@]}" "${systemd_service_file}" &> /dev/null << EOF
-[Unit]
-Description=Udev sync
-
-[Service]
-Type=oneshot
-ExecStart=${script_path} %i
-RemainAfterExit=no
-
-[Install]
-WantedBy=
-
-EOF
-
-    if [[ $? -eq 0 ]]; then
-        sudo systemctl daemon-reload
-        log info "Custom systemd service installed and reloaded '${systemd_service_file}'"
-    else
-        log error "Failed to install custom service '${systemd_service_file}'"
-    fi
-}
-
-function WriteUdevBackupScript() {
+function CreateUdevSyncScript() {
     local -n items_ref=$1 # Nameref to ITEMS array
     local root_dir="${2}"
-    local install_path="${3}"
+    local script_path="${3}"
     local archive_fmt="${4}"
     local archive_name="${5}"
     local logfile="${6}"
-    local -i archive_flag=$7
-    local -i update_this_script=$8
+    local remove_pattern="${7}"
+    local -i archive_flag=${8}
+    local -i update_this_script=${9}
+    local -i install_or_purge=${10}
 
     local -a write=(sudo tee)
 
     if [[ $update_this_script -eq 1 ]]; then
-        log info "Updating udev backup script '${install_path}'"
+        log info "Updating udev backup script '${script_path}'"
         write=(tee)
     else
-        log info "Installing udev backup script to '${install_path}'"
         sudo -v
-        sudo mkdir -p "$(dirname "${install_path}")"
+        if [[ $install_or_purge -eq 0 ]]; then
+            [[ -f "${script_path}" ]] || { log error "Script '${script_path}' does not exist"; return 1; }
+            log info "Removing custom script '${script_path}'"
+            if sudo rm "${script_path}"; then
+                log info "Custom script removed '${script_path}'\n"
+            else
+                log error "Could not remove script '${script_path}'\n"
+                return 1
+            fi
+            return 0
+        fi
+
+        log info "Installing udev sync script: '${script_path}'"
+        sudo mkdir -p "${script_path%%/${script_path##*/}}"
     fi
-    "${write[@]}" "${install_path}" > /dev/null << EOF
+
+    "${write[@]}" "${script_path}" > /dev/null << EOF
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -207,15 +199,22 @@ function RaiseRootError() {
 }
 
 function Cleanup() {
-    local mountpoint="\${1:-""}"
+    local mountpoint_dir="\${1:-""}"
     local led_file="\${2:-""}"
     local led_file_original_state="\${3:-0}"
 
-    log debug "Cleaning up: umount '\${mountpoint}', reset LED '\${led_file}' to \${led_file_original_state}"
+    log info "Performing cleanup"
 
-    [[ -n "\${mountpoint}" ]] && umount "\${mountpoint}" &>> "\${logfile}"
-    [[ -n "\${mountpoint}" ]] && rmdir "\${mountpoint}" &>> "\${logfile}"
+    log debug "Cleaning up: umount '\${mountpoint_dir}', reset LED '\${led_file}' to \${led_file_original_state}"
+
+    if [[ -n "\${mountpoint_dir}" ]]; then
+        mountpoint -q "\${mountpoint_dir}" && umount "\${mountpoint_dir}" &>> "\${logfile}" || true
+        rmdir "\${mountpoint_dir}" &>> "\${logfile}"
+    fi
     [[ -n "\${led_file}" ]] && echo "\${led_file_original_state}" > "\${led_file}" 2>> "\${logfile}" || true
+
+    log info "Exiting -- goodbye"
+    exit 0
 }
 
 function BlinkLed() {
@@ -228,13 +227,13 @@ function BlinkLed() {
     if [[ "\${should_loop}" == "loop_inf" ]]; then
         while true; do
             for i in {0,1}; do
-                echo \$i > "\${led_file}"
+                echo "\$i" > "\${led_file}"
                 sleep 0.1
             done
         done
     else
         log info "write: echo \$set_original > '\${led_file}'"
-        echo \$set_original > "\${led_file}"
+        echo "\$set_original" > "\${led_file}"
         return 0
     fi
 
@@ -269,43 +268,49 @@ function Archive() {
             tar --exclude="*.tar" -c -f "\${archive_name}.\${fmt}" . &>> \${logfile}
             ;;
     esac
-    log cmd_info "moving data: cp '\$(pwd)/\${archive_name}.\${fmt}' '\${target_dir}' && rm -f '\${archive_name}.\${fmt}' &>> \${logfile}"
-    cp "\$(pwd)/\${archive_name}.\${fmt}" "\${target_dir}" && rm -rf "\${archive_name}.\${fmt}" &>> \${logfile}
+    log cmd_info "moving data: cp '\$(pwd)/\${archive_name}.\${fmt}' '\${target_dir}'"
+    if cp "\$(pwd)/\${archive_name}.\${fmt}" "\${target_dir}"; then
+        log cmd_infog "rm -rvf '\${archive_name}.\${fmt}' &>> \${logfile}"
+        rm -rvf "\${archive_name}.\${fmt}" &>> \${logfile}
+    else
+        log cmd_error "failed moving data: cp '\$(pwd)/\${archive_name}.\${fmt}' '\${target_dir}'"
+    fi
     cd -
 }
 
 function main() {
     local devnode="\${1//-/\/}"
-    local mountpoint=""
     local root_dir="${root_dir:-"data_backup"}"
-    local archive_flag=${archive_flag}
-    local archive_fmt="${archive_fmt}"
-    local archive_name="${archive_name}"
-    local archive_dir="/var/tmp/udev_sync"
+    local archive_flag=${archive_flag:-""}
+    local archive_fmt="${archive_fmt:-""}"
+    local archive_name="${archive_name:-""}"
+    local remove_pattern="${remove_pattern:-""}"
     local -g logfile="${logfile}"
+    local archive_dir="/var/tmp/udev_sync"
+    local remove_pattern_arr=""
+    local target_root=""
+    local mountpoint_dir=""
     local target=""
-    mountpoint="/media/udev_sync_\$(echo "\${devnode##*/:-"0"}" | tr -cd '0-9')"
+    mountpoint_dir="/media/udev_sync_\${devnode##*/}"
+    mapfile -t remove_pattern_arr < <(tr '|' '\n' <<< "\${remove_pattern}")
 
-    mkdir -p "\$(dirname "\${logfile}")"
+    trap 'Cleanup "\${mountpoint_dir}" "\${led_file}" "\${led_original_state}"; exit 0' EXIT SIGINT SIGTERM
+
+    mkdir -p "\${logfile%%/\${logfile##*/}}"
 
     if [[ -f \${logfile} ]]; then
         printf '\n' &>> \${logfile}
-    else
-        true
     fi
 
     RaiseRootError
 
-    trap 'Cleanup \${mountpoint} \${led_file} \${led_original_state}' EXIT
+    log info "create mountpoint dir: '\${mountpoint_dir}'"
+    mkdir -p "\${mountpoint_dir}"
 
-    log info "create mountpoint dir: '\${mountpoint}'"
-    mkdir -p "\${mountpoint}"
-
-    if mountpoint -q "\${mountpoint}"; then
-        log info "mount-point already exists, unmounting '\${mountpoint}'"
-        umount "\${mountpoint}" &>> "\${logfile}"
-    else
-        true
+    # If already mounted unmount it first
+    if mountpoint -q "\${mountpoint_dir}"; then
+        log info "mount-point already exists, unmounting '\${mountpoint_dir}'"
+        umount "\${mountpoint_dir}" &>> "\${logfile}" || umount --lazy "\${mountpoint_dir}"
     fi
 
     if [[ -b "\${devnode}" ]]; then
@@ -315,67 +320,83 @@ function main() {
         return 1
     fi
 
-    log cmd_info "attempting to mount: sleep 1 && mount '\${devnode}' '\${mountpoint}' &>> \${logfile}"
-    if sleep 1 && mount "\${devnode}" "\${mountpoint}" &>> "\${logfile}"; then
-        log info "mounted '\${devnode}' to '\${mountpoint}'"
+    log cmd_info "attempting to mount: sleep 1 && mount '\${devnode}' '\${mountpoint_dir}' &>> \${logfile}"
+    if sleep 1 && mount "\${devnode}" "\${mountpoint_dir}" &>> "\${logfile}"; then
+        log info "mounted '\${devnode}' to '\${mountpoint_dir}'"
     else
-        log error "mount failed: mount '\${devnode}' '\${mountpoint}'"
+        log error "mount failed: mount '\${devnode}' '\${mountpoint_dir}'"
         exit 1
     fi
 
     if [[ \$archive_flag -eq 1 ]]; then
         log info "create archive dir: mkdir -p '\${archive_dir}'"
         mkdir -p "\${archive_dir}"
-    else
-        true
     fi
 
+    # Start led blink
     local led_file blink_pid led_original_state="0"
     led_file="\$(echo /sys/class/leds/*::capslock/brightness)"
     if [[ -f "\${led_file}" ]]; then
-        led_original_state="\$(cat \${led_file} 2>> "\${logfile}" || { printf '%s\n' "Failed to read '\${led_file}', assuming 0" &>> "\${logfile}"; led_original_state=0; } )"
+        led_original_state="\$(cat "\${led_file}" 2>> "\${logfile}" || led_original_state=0; })"
         log info "led file: '\${led_file}'"
         log info "led file original state: '\${led_original_state}'"
         log info "led blinking"
         BlinkLed loop_inf "\${led_file}" &
         blink_pid=\$!
-    else
-        true
     fi
+
+    if [[ \$archive_flag -eq 1 ]]; then
+        target_root="\${archive_dir}/\${root_dir}"
+    else
+        target_root="\${mountpoint_dir}/\${root_dir}"
+    fi
+
     for item in "\${ITEMS[@]}"; do
         IFS='|' read -r src dest <<< "\${item}"
+
         [[ -e "\${src}" ]] || { log error "\${src}: no such file or dir"; continue; }
+        target="\${target_root}/\${dest}"
+
         # Block system dirs (basic check)
-        [[ "\${src}" =~ ^(/dev|/sys|/proc|/run|/tmp) ]] && { log error "\${src}: blocked system dir"; continue; }
-        [[ \$archive_flag -eq 1 ]] && target="\${archive_dir}/\${root_dir}/\${dest}" || target="\${mountpoint}/\${root_dir}/\${dest}"
+        [[ "\${src}" =~ ^(/bin|/dev|/sys|/proc|/run|/tmp) ]] && \\
+            { log error "\${src}: blocked system dir form src=\${src}"; continue; }
+        [[ "\${target}" =~ ^(/bin|/dev|/sys|/proc|/run|/tmp) ]] && \\
+            { log error "\${src}: blocked system dir form target=\${target}"; continue; }
+
         log cmd_info "create target dir: mkdir -p '\${target}'"
         mkdir -p "\${target}"
+
         log cmd_info "copy data: cp -LTvr '\${src}' '\${target}' &>> '\${logfile}'"
         cp -LTvr "\${src}" "\${target}" &>> "\${logfile}"
     done
 
+    # Remove any pattern matching item from root dir
+    for pattern in "\${remove_pattern_arr[@]}"; do
+        log cmd_info "find remove pattern and remove it: find '\${target_root}' -path '\${pattern}' -exec rm -vr '{}' ';'"
+        find "\${target_root}" -path "\${pattern}" -exec rm -vr "{}" ';' || true
+    done
+
+    # Stop led blink
     if [[ -f "\${led_file}" ]]; then
         log info "stop led blink"
         log cmd_info "Kill led blink: kill -SIGTERM \$blink_pid"
         kill -SIGTERM \$blink_pid
         log func_call "set original state: BlinkLed 'no_loop' '\${led_file}' \$led_original_state"
         BlinkLed no_loop "\${led_file}" "\$led_original_state"
-    else
-        true
     fi
 
     if [[ \${archive_flag} -eq 1 ]]; then
         log func_call "archiving: Archive '\${archive_dir}' '\${archive_fmt}' '\${archive_name}'"
-        Archive "\${archive_dir}" "\${archive_fmt}" "\${archive_name}" "\${mountpoint}/\${root_dir}"
-    else
-        true
+        Archive "\${archive_dir}" "\${archive_fmt}" "\${archive_name}" "\${mountpoint_dir}/\${root_dir}"
     fi
 
-    if sync && sleep 1 && umount "\${mountpoint}" &>> \${logfile}; then
-        log info "unmounted '\${mountpoint}'"
+    if sync && sleep 1 && umount "\${mountpoint_dir}" &>> \${logfile}; then
+        log info "unmounted '\${mountpoint_dir}'"
     else
-        log info "failed to unmount '\${mountpoint}'"
+        log info "failed to unmount '\${mountpoint_dir}'"
     fi
+
+    Cleanup "\${mountpoint_dir}" "\${led_file}" "\${led_original_state}"
 }
 
 main "\$@"
@@ -384,37 +405,101 @@ EOF
     [[ $? -eq 0 ]] || return 1
 
     if [[ $update_this_script -eq 1 ]]; then
-        log info "Successfully updated '${install_path}'"
+        log info "Successfully updated '${script_path}'\n"
     else
         USER="${USER}"
-        sudo chown "${SUDO_USER:-${USER}}":root "${install_path}"
-        sudo chmod 0755 "${install_path}"
-        log info "Successfully installed script at '${install_path}'"
+        sudo chown "${SUDO_USER:-${USER}}" "${script_path}"
+        sudo chmod 0755 "${script_path}"
+        log info "Successfully installed script at '${script_path}'\n"
     fi
 }
 
-function WriteUdevRule() {
+function CreateSystemdService() {
+    local service_name="${1}"
+    local script_path="${2}"
+    local -i install=${3}
+
+    local write=(sudo tee)
+    local service_dir="/etc/systemd/system"
+    local systemd_service_file="${service_dir}/${service_name}@.service"
+
+    sudo -v
+    if [[ $install -eq 1 ]]; then
+        sudo mkdir -p "${service_dir}"
+        log info "Installing custom systemd service: '${systemd_service_file}'"
+    else
+        [[ -f "${systemd_service_file}" ]] || { log error "Service '${systemd_service_file}' does not exist"; return 1; }
+        log info "Removing custom systemd service '${script_path}'"
+        sudo rm "${systemd_service_file}"
+        if sudo systemctl --quiet daemon-reload; then
+            log info "Custom systemd service removed and disabled '${systemd_service_file}'\n"
+        else
+            log error "Failed to remove and disable custom service '${systemd_service_file}'\n"
+            return 1
+        fi
+        return 0
+    fi
+
+"${write[@]}" "${systemd_service_file}" &> /dev/null << EOF
+[Unit]
+Description=Udev sync
+
+[Service]
+Type=oneshot
+ExecStart=${script_path} %i
+RemainAfterExit=no
+
+[Install]
+WantedBy=
+
+EOF
+
+    if [[ $? -eq 0 ]]; then
+        sudo systemctl --quiet daemon-reload
+        log info "Custom systemd service installed and reloaded '${systemd_service_file}'\n"
+    else
+        log error "Failed to install custom service '${systemd_service_file}'\n"
+    fi
+}
+
+function CreateUdevRule() {
     local rule_file_name="${1}"
     local deviceUUID="${2}"
     local systemd_service_name="${3}"
+    local -i install=${4}
 
     local write=(sudo tee)
     local rule_dir="/etc/udev/rules.d"
     local rule_file="${rule_dir}/${rule_file_name}.rules"
     local rule="ACTION==\"add\", SUBSYSTEM==\"block\", ENV{ID_FS_UUID}==\"${deviceUUID}\", RUN+=\"/usr/bin/systemctl restart ${systemd_service_name}@%N.service\""
     sudo -v
-    sudo mkdir -p "${rule_dir}"
-    sudo mkdir -p "$(dirname "${rule_file}")"
-    log info "Writing udev rule to '${rule_file}'"
-    printf '%s\n' "${rule}" | "${write[@]}" "${rule_file}" > /dev/null
-    sudo udevadm control --reload-rules
-    [[ $? -eq 0 ]] && log info "Udev rule installed and reloaded"
-}
+    if [[ $install -eq 1 ]]; then
+        sudo mkdir -p "${rule_dir}"
+        sudo mkdir -p "${rule_file%%/${rule_file##*/}}"
+        log info "Installing custom udev rule: '${rule_file}'"
+    else
+        [[ -f "${rule_file}" ]] || { log error "Rule '${rule_file}' does not exist"; return 1; }
+        log info "Removing custom udev rule '${rule_file}'"
+        if sudo rm "${rule_file}"; then
+            sudo udevadm control --reload-rules
+            log info "Custom udev rule removed '${rule_file}'\n"
+        else
+            log error "Failed to remove custom udev rule '${rule_file}'\n"
+            return 1
+        fi
+        return 0
+    fi
 
-function GenUdevRule() {
-    log info "Identify your device's partition UUID:"
-    lsblk -o NAME,LABEL,FSTYPE,UUID | grep -v '^NAME'
-    log info "Then use: ${0##*/} --rule --uuid=<UUID>"
+    if printf '%s\n' "${rule}" | "${write[@]}" "${rule_file}" &> /dev/null; then
+        if sudo udevadm control --reload-rules; then
+            log info "Udev rule installed and reloaded: '${rule_file}'\n"
+            return 0
+        else
+            log error "Udev rule installed and failed to reload udev rule: '${rule_file}'\n"
+        fi
+    else
+        log error "Failed to install udev rule: '${rule_file}'\n"
+    fi
 }
 
 function EditConfig() {
@@ -423,13 +508,13 @@ function EditConfig() {
     local temp_configFile="$(mktemp -t "${configFile##*/}.XXXX")"
     [[ ! -s "${temp_configFile}" ]] || { log error "Could not create temp file"; return 1; }
 
-    [[ ! -s "${configFile}" ]] && WriteNewConfig "${configFile}"
+    [[ ! -s "${configFile}" ]] && CreateNewUserConfig "${configFile}"
     log info "Editing '${configFile}' with \${EDITOR:-vim}"
     cp "${configFile}" "${temp_configFile}"
     ${EDITOR:-vim} "${temp_configFile}"
     if diff -q <(grep -v "#" "${configFile}") <(grep -v "#" "${temp_configFile}") &> /dev/null; then
         # If there's no diff just return
-        rm -f "${temp_configFile}" &> /dev/null
+        rm -f "${temp_configFile}"
         return 0
     fi
     source "${temp_configFile}"
@@ -437,7 +522,7 @@ function EditConfig() {
         SHOULD_ARCHIVE ARCHIVE_NAME ARCHIVE_FORMAT SYSTEMD_SERVICE_NAME; do
         declare -p "${var}" &> /dev/null && continue || true
         if [[ ! -s "${temp_configFile}" ]]; then
-            WriteNewConfig "${configFile}"
+            CreateNewUserConfig "${configFile}"
             cp "${configFile}" "${temp_configFile}"
             source "${temp_configFile}"
         else
@@ -449,11 +534,17 @@ function EditConfig() {
     log info "New changes detected in configuration, regenerating script"
     set_flag=1
     mv "${temp_configFile}" "${configFile}"
-    rm -f "${temp_configFile}" &> /dev/null
+    rm -f "${temp_configFile}"
+}
+
+function UpdateConfigVars() {
+    local -n update=$1
+    sed -i "s@.*${update[0]}.*@${update[0]}=${update[1]}@"
 }
 
 function main() {
     local -a args=("$@")
+    # Vars
     local script_name="${0##*/}"
     local config_dir="${HOME}/.custom/${script_name}"
     local config_file="${config_dir}/config"
@@ -461,29 +552,52 @@ function main() {
     local script_install_path="/opt/bin/${script_name}_"
     local logfile="/tmp/.${script_name}.log"
     local uuid="" root_dir="" archive_fmt="" archive_name=""
+    local remove_pattern=""
     local systemd_service_name=""
-    local -i archive_flag=0
-    local -i update_script=0
-    local -i should_cat_log=0
     local -a apply_config_update=()
+
+    # On-Off Flags
+    local -i archive_flag=0 update_script=0
+    local -i should_cat_log=0 show_service_status=0
+    local -i is_script_installed=0
+
+    # Install flags
+    local -i should_install_udev_rule=0  should_install_script=0
+    local -i should_install_systemd_service=0
+    local -i should_install_or_purge=1 # 1 to install and 0 to purge
 
     mkdir -p "${config_dir}"
 
     # Arg parsing
-    local -i should_edit=0 should_create_rule=0
-    local -i should_install_script=0 is_script_installed=0
-    local -i show_service_status=0
+    local -i should_edit=0 show_help=0
     local -i i=0
     while [[ $i -lt ${#args[@]} ]]; do
         case "${args[$i]}" in
-            --edit|--config|edit|config)
+            --edit*|edit*)
                 should_edit=1
                 ;;
-            --rule|--gen*rule|gen*rule|rule)
-                should_create_rule=1
+            --config*|config*)
+                should_edit=1
                 ;;
-            --install*|install*)
+            --*script*|--install*script*|install*script*|*script*)
                 should_install_script=1
+                ;;
+            --*rule*|--gen*rule*|install*rule*|gen*rule*|install*rule*|*rule*)
+                should_install_udev_rule=1
+                ;;
+            --service*|install*service*|service*|system*service*)
+                should_install_systemd_service=1
+                ;;
+            --all*|all*)
+                should_install_script=1
+                should_install_udev_rule=1
+                should_install_systemd_service=1
+                ;;
+            --purge*|--remove*|--disable*|purge*|remove*|disable*)
+                should_install_or_purge=0
+                ;;
+            --install*|install*|enable*)
+                should_install_or_purge=1
                 ;;
             --update*|update*)
                 update_script=1
@@ -493,7 +607,7 @@ function main() {
                 apply_config_update=( "PARTITION_UUID" "${uuid}" )
                 UpdateConfigVars apply_config_update
                 ;;
-            --uuid|uuid)
+            --uuid*|uuid*)
                 i=$((i+1))
                 [[ $i -lt ${#args[@]} ]] && uuid="${args[$i]}" || \
                     { log error "--uuid requires value"; return 1; }
@@ -521,8 +635,7 @@ function main() {
                 show_service_status=1
                 ;;
             -h|--help*|help*)
-                Usage "${script_install_path}"
-                return 0
+                show_help=1
                 ;;
             *)
                 log error "Unknown arg: '${args[$i]}'"
@@ -534,6 +647,15 @@ function main() {
     done
 
     DependencyChecks
+
+    if [[ $show_help -eq 1 ]]; then
+        if [[ $should_install_udev_rule -eq 1 ]]; then
+            GenUdevRuleHelp
+        else
+            Usage "${script_install_path}"
+        fi
+        return 0
+    fi
 
     if [[ $should_edit -eq 1 ]]; then
         if EditConfig "${config_file}" update_script; then
@@ -549,61 +671,82 @@ function main() {
         source_attempt=$((source_attempt+1))
         [[ $source_attempt -gt 1 ]] && \
             log info "Config source attempt ${source_attempt}"
-        if [[ -s "${config_file}" ]]; then
-            if source "${config_file}"; then
-                declare -p ITEMS &> /dev/null || \
-                    { log error "ITEMS array missing in config"; return 1; }
-                [[ -n "${ROOT_DIR:-""}" && "${ROOT_DIR:-""}" != "/" ]] && \
-                    root_dir="${ROOT_DIR}" || { log error "Invalid or empty var \$ROOT_DIR, update the config"; return 1; }
-                [[ -n "${PARTITION_UUID:-""}" && "${PARTITION_UUID:-""}" != "<UUID>" ]] && \
-                    uuid="${PARTITION_UUID}" || { log error "empty var \$PARTITION_UUID, update the config"; return 1; }
-                [[ -n "${UDEV_RULE_NAME:-""}" ]] && \
-                    udev_rule_name="${UDEV_RULE_NAME}" || { log error "empty var \$UDEV_RULE_NAME, update the config"; return 1; }
-                [[ -n "${ARCHIVE_FORMAT:-""}" ]] && \
-                    archive_fmt="${ARCHIVE_FORMAT}" || { log error "empty var \$ARCHIVE_FORMAT, update the config"; return 1; }
-                [[ -n "${ARCHIVE_NAME:-""}" ]] && \
-                    archive_name="${ARCHIVE_NAME}" || { log error "empty var \$ARCHIVE_NAME, update the config"; return 1; }
-                [[ -n "${SYSTEMD_SERVICE_NAME:-""}" ]] && \
-                    systemd_service_name="${SYSTEMD_SERVICE_NAME}" || { log error "empty var \$SYSTEMD_SERVICE_NAME, update the config"; return 1; }
-                archive_flag=${SHOULD_ARCHIVE:-0}
-                should_break=1
-            else
-                log warn "Failed to source config, regenerating config"
-                WriteNewConfig "${config_file}"
-            fi
-        else
-            WriteNewConfig "${config_file}"
+        if [[ ! -s "${config_file}" ]]; then
+            CreateNewUserConfig "${config_file}" || { log error "Failed to write '${config_file}'"; return 1; }
         fi
+
+        if ! source "${config_file}"; then
+            log warn "Failed to source config, regenerating config"
+            CreateNewUserConfig "${config_file}" || { log error "Failed to write '${config_file}'"; return 1; }
+        fi
+
+        declare -p ITEMS &> /dev/null || { log error "ITEMS array missing in config"; return 1; }
+
+        setVar() {
+            local -n ref1=${1}
+            local -n ref2=${2}
+            local should_not_match="${3:-"_NONE_"}"
+
+            if [[ -n "${ref2:-""}" && "${ref2:-""}" != "${should_not_match}" ]]; then
+                ref1="${ref2:-""}"
+            else
+                log error "Invalid or empty var \$${!ref2}, update the config"
+                return 1
+            fi
+        }
+
+        setVar root_dir             ROOT_DIR                "/"
+        setVar uuid                 PARTITION_UUID          "<UUID>"
+        setVar udev_rule_name       UDEV_RULE_NAME          ""
+        setVar archive_fmt          ARCHIVE_FORMAT          ""
+        setVar archive_name         ARCHIVE_NAME            ""
+        setVar systemd_service_name SYSTEMD_SERVICE_NAME    ""
+        setVar remove_pattern       REMOVE_PATTERN          ""
+
+        unset -f setVar
+
+        archive_flag=${SHOULD_ARCHIVE:-0}
+        should_break=1
     done
 
-    [[ $show_service_status -eq 1 ]] && ShowServiceStatus "${systemd_service_name}"
+    [[ -s "${script_install_path}" ]] && is_script_installed=1 || true
 
-    if [[ $should_create_rule -eq 1 || $should_install_script -eq 1 ]]; then
-        [[ -n "${uuid}" ]] || { GenUdevRule; return 1; }
-        WriteUdevRule "${udev_rule_name}" "${uuid}" "${systemd_service_name}"
+    [[ $show_service_status -eq 1 ]] && { ShowServiceStatus "${systemd_service_name}"; return 0; }
+
+    # Install/Purge Udev Rule
+    if [[ $should_install_udev_rule -eq 1 ]]; then
+        [[ -n "${uuid}" ]] || { GenUdevRuleHelp; return 1; }
+        CreateUdevRule "${udev_rule_name}" "${uuid}" "${systemd_service_name}" $should_install_or_purge
     fi
 
-    ls "${script_install_path}" &> /dev/null && is_script_installed=1 || true
-
-    if [[ $should_install_script -eq 1 || ($update_script -eq 1 && $is_script_installed -eq 1) ]]; then
-        WriteUdevBackupScript \
-            ITEMS "${root_dir}" \
-            "${script_install_path}" "${archive_fmt}" \
-            "${archive_name}" "${logfile}" \
-            $archive_flag $update_script
-        [[ $update_script -eq 0 ]] && WriteSystemdSerivce "${systemd_service_name}" "${script_install_path}"
-        return $?
+    # Install/Purge or update Udev Sync Script
+    if [[ ($update_script -eq 1 && $is_script_installed -eq 1) ||  $should_install_script -eq 1 ]]; then
+        CreateUdevSyncScript \
+            ITEMS "${root_dir}" "${script_install_path}" \
+            "${archive_fmt}" "${archive_name}" \
+            "${logfile}" "${remove_pattern}" \
+            $archive_flag $update_script $should_install_or_purge
+    fi
+    # Install/Purge Systemd service
+    if [[ $should_install_systemd_service -eq 1 ]]; then
+        CreateSystemdService "${systemd_service_name}" "${script_install_path}" $should_install_or_purge
     fi
 
-    # Default: Check readiness
-    local rule_ready=0 script_ready=0
+    # Check readiness
+    local rule_ready=0 script_ready=0 service_ready=0
+
     [[ -s "/etc/udev/rules.d/${udev_rule_name}.rules" ]] && rule_ready=1
     [[ -s "${script_install_path}" ]] && script_ready=1
-    if [[ $rule_ready -eq 0 || $script_ready -eq 0 ]]; then
-        log info \
-            "Setup incomplete. Run: ${0##*/} --edit; ${0##*/} --rule --uuid=<UUID>; ${0##*/} --install"
-        return 1
-    fi
+    [[ -s "/etc/systemd/system/${systemd_service_name}@.service" ]] && service_ready=1
+
+    [[ $rule_ready -eq 0 && $should_install_or_purge -eq 1 ]] && \
+        { log warn "Udev rules not ready, install service: ${0##*/} install rule"; }
+    [[ $script_ready -eq 0 && $should_install_or_purge -eq 1 ]] && \
+        { log warn "Sync Script not ready, install service: ${0##*/} install script"; }
+    [[ $service_ready -eq 0 && $should_install_or_purge -eq 1 ]] && \
+        { log warn "Systemd services not ready, install service: ${0##*/} install service"; }
+
+    return 0
 }
 
 main "$@"

@@ -13,16 +13,16 @@ GREY="\033[38;2;160;160;140m"
 BLUE="\033[38;2;150;134;255m"
 NC="\033[0m"
 
-declare -a  mpv_flags=()
+declare -a  play_tui_flags=()
 declare -a SELECTED=() CURRENTLY_PLAYING=()
 
 QUIET=0
 MPV_PID=0
 
-# readonly MPV_SOCKET_DIR="/tmp/mpv_playing"
-# readonly SOCKET="mpv_socket-$RANDOM"
+# readonly MPV_SOCKET_DIR="/tmp/play_tui_playing"
+# readonly SOCKET="play_tui_socket-$RANDOM"
 # readonly MPV_SOCKET="${MPV_SOCKET_DIR}/$SOCKET"
-# readonly MPV_LOG="${MPV_SOCKET_DIR}/mpv_log.log"
+# readonly MPV_LOG="${MPV_SOCKET_DIR}/play_tui_log.log"
 MUSIC_DIR="${HOME}/Music"
 
 # function cleanup() {
@@ -52,7 +52,7 @@ function LOG() {
 }
 
 function ColorPath() {
-    sed "s@${HOME}@${BLUE//\\/\\\\}\${HOME}${NC//\\/\\\\}@g" <(printf '%s\n' "$1")
+    sed "s@${HOME}@${BLUE//\\/\\\\}~${NC//\\/\\\\}@g" <(printf '%s\n' "$1")
 }
 
 function Exit() {
@@ -117,9 +117,9 @@ function TurnMusicOn() {
 
     # mkdir -p "${MPV_SOCKET_DIR}"
 
-    if [[ $mpv_ -eq 1 ]]; then
+    if [[ $play_tui_ -eq 1 ]]; then
         CURRENTLY_PLAYING="$(basename "${MUSIC_DIR}/${f}")"
-        mpv ${mpv_flags[@]} "${files_joined[@]/#/${MUSIC_DIR}/}"
+        mpv ${play_tui_flags[@]} "${files_joined[@]/#/${MUSIC_DIR}/}"
     else
         LOG info "${BLUE}Tracks${NC}:"
         for (( i=0; i < ${#files_joined[@]}; i++)); do
@@ -130,8 +130,8 @@ function TurnMusicOn() {
             LOG info "  ${GREY}$track_num${NC} ${LIGHT_SKIN}${CURRENTLY_PLAYING[$i]%.*}${NC}"
         done
         printf '\n'
-        LOG command_ "${GREY}COMMAND${NC}: ${BROWN}mpv${NC}" "${mpv_flags[@]}" "${quoted_files[@]}"
-        mpv "${mpv_flags[@]}" "${files_joined[@]/#/${MUSIC_DIR}/}"
+        LOG command_ "${GREY}COMMAND${NC}: ${BROWN}mpv${NC}" "${play_tui_flags[@]}" "${quoted_files[@]}"
+        mpv "${play_tui_flags[@]}" "${files_joined[@]/#/${MUSIC_DIR}/}"
         printf '\n'
     fi
 }
@@ -153,7 +153,7 @@ function main() {
     local arg=
     local volume=
     local video=
-    local -g loop=0 mpv_=0
+    local -g loop=0 play_tui_=0
     local shuffle=0
 
     CheckDependencies
@@ -184,8 +184,8 @@ function main() {
             -q|--quiet)
                 QUIET=1
                 ;;
-            -m|--mpv|mpv)
-                mpv_=1
+            -t|-*tui|tui)
+                play_tui_=1
                 ;;
             -s|--shuff|shuff|--shuffle|shuffle)
                 shuffle=1
@@ -222,28 +222,28 @@ function main() {
     [[ $shuffle -eq 1 && $loop -eq 0 ]] && LOG warn "Shuffle can only be used with mutiple tracks"
     [[ $shuffle -eq 1 ]] && SELECTED=($(printf "%s\n" "${SELECTED[@]}" | shuf))
 
-    mpv_flags+=(
+    play_tui_flags+=(
         "--vid=${video:-"no"}"
         "--volume=${volume:-94}"
     )
 
-    mpv_flags+=(
+    play_tui_flags+=(
         "--osc=no"
         "--script-opts=mpris=yes"
     )
 
-    if  [[ $mpv_ -eq 1 ]]; then
-        mpv_flags+=(
+    if  [[ $play_tui_ -eq 1 ]]; then
+        play_tui_flags+=(
             "--vo=tct"
             "--vid=auto"
             "--really-quiet"
         )
     else
-        mpv_flags+=(
+        play_tui_flags+=(
             "--vo=gpu-next"
         )
     fi
-    mpv_flags+=(
+    play_tui_flags+=(
         "--hwdec=vulkan"
         "--gpu-api=vulkan"
         "--hdr-compute-peak"
@@ -252,7 +252,7 @@ function main() {
         "--really-quiet"
     )
 
-    [[ "${QUIET}" -eq 1 ]] && mpv_flags+=("--really-quiet")
+    [[ "${QUIET}" -eq 1 ]] && play_tui_flags+=("--really-quiet")
 
     ### Play music
     Play

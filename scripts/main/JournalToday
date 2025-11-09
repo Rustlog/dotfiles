@@ -1,0 +1,342 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+RED="\033[38;2;159;29;75m"
+GREEN="\033[38;2;108;176;97m"
+BLUE="\033[38;2;103;128;229m"
+LIGHT_GREEN="\033[38;2;115;202;97m"
+MUDDY="\033[38;2;181;191;121m"
+NC="\033[0m"
+
+function log() {
+    local _type="${1}"; shift 1
+    local mark=""
+    case "${_type}" in
+        error) _color="${RED}" mark="!";;
+        info) _color="${GREEN}" mark="*" ;;
+    esac
+    case "${_type}" in
+        *info*|*debug*) [[ $verbose -eq 0 ]] || printf "[%b%s%b]: %b\n" "${_color}" "${_type}${mark}" "${NC}" "${*}" ;;
+        *) printf "[%b%s%b]: %b\n" "${_color}" "${_type}${mark}" "${NC}" "${*}" ;;
+    esac
+}
+
+function ColorPath() {
+    sed -e "s@${HOME}@${BLUE//\\/\\\\}~${NC//\\/\\\\}@g" <(printf "%s\n" "${1}")
+}
+
+function CreateNewKey() {
+    local key="" abc=""
+    key="$(printf '%s\n' {{A..Z},{a..z}} | shuf | tr -d '\n' )"
+    abc="$(printf '%s\n' {{A..Z},{a..z}} | tr -d '\n')"
+    local -r new_key="$(printf "%s -> %s\n" "${key}" "${abc}")"
+    if [[ -n "${new_key}" ]]; then
+        printf '%s\n' "${new_key}" 1> "${TRANSFORM_KEY}" && \
+            log info "New key saved at '$(ColorPath "${TRANSFORM_KEY}")'"
+        cp "${TRANSFORM_KEY}" "${TRANSFORM_KEY}.bak"
+    else
+        log error "Failed to create new key"
+    fi
+}
+
+function EncodeTextFile() {
+    local FILE1="${1}" # Plain text file (no substitution cipher)
+    local FILE2="${2}" # The journal file
+    [[ -n "${FILE1}" ]] || { log error "${FUNCNAME[0]}: '\${FILE1}' is empty"; return 1; }
+    [[ -n "${FILE2}" ]] || { log error "${FUNCNAME[0]}: '\${FILE2}' is empty"; return 1; }
+    # fill FILE2 from readable text ==> Gibrish
+    log info "Applying Substitution cipher '$(ColorPath "${FILE1}")' ==> '$(ColorPath "${FILE2}")'"
+    tr 'A-Za-z' "${TRANSFORM_KEY}" < "${FILE1}" > "${FILE2}"
+}
+
+function DecodeTextFile() {
+    local FILE1="${1}" # substitution cipher encoded file
+    local FILE2="${2}" # Temporary file
+    [[ -n "${FILE1}" ]] || { log error "${FUNCNAME[0]}: '\${FILE1}' is empty"; return 1; }
+    [[ -n "${FILE2}" ]] || { log error "${FUNCNAME[0]}: '\${FILE2}' is empty"; return 1; }
+    # Fill FILE2 from Gibrish ==> readable text
+    log info "Reverting Substitution cipher '$(ColorPath "${FILE1}")' ==> '$(ColorPath "${FILE2}")'"
+    tr "${TRANSFORM_KEY}" 'A-Za-z' < "${FILE1}" > "${FILE2}"
+}
+
+function Cleanup() {
+    local journal_file="${1}"
+    if [[ -s "${TEMP_FILE}" ]]; then
+        EncodeTextFile "${TEMP_FILE}" "${journal_file}"
+        rm -f "${TEMP_FILE}" &> /dev/null || true
+    fi
+    log info "Temporary file cleaned '$(ColorPath "${TEMP_FILE}")'"
+}
+
+function ShowJournal() {
+    local journal_file="${1:-""}"
+    local KEY=""
+    local -a bat_cmd_args=(
+        "--language=markdown"
+        "--paging=never"
+        "--decorations=never"
+        "--color=always"
+    )
+
+    if [[ -s "${TRANSFORM_KEY}" ]]; then
+        KEY="$(cut -d' ' -f1 "${TRANSFORM_KEY}")"
+    else
+        KEY="${TRANSFORM_KEY}"
+    fi
+    [[ -n "${KEY}" ]] || { log error "No keys?"; return 1; }
+    log info "File: '${journal_file}'\n"
+
+    if grep -q "^# Date:" <(head -n1 "${journal_file}" | tr "${KEY}" 'A-Za-z'); then
+        if command -v bat &> /dev/null; then
+            bat "${bat_cmd_args[@]}" <(tr "${KEY}" 'A-Za-z' < "${journal_file}")
+            return $?
+        else
+            tr "${KEY}" 'A-Za-z' < "${journal_file}"
+        fi
+    else
+        if command -v bat &> /dev/null; then
+            bat "${bat_cmd_args[@]}" "${journal_file}"
+            return $?
+        else
+            cat "${journal_file}"
+        fi
+    fi
+    log info "Process completed, exiting..."
+}
+
+function ShowTemplate() {
+    local template="${1}"
+    echo && log info "Template: $(ColorPath "${template}")\n"
+    if command -v bat &> /dev/null; then
+        local -a cmd_args=(
+            "--language=markdown"
+            "--paging=never"
+            "--decorations=never"
+            "--color=always"
+        )
+        bat "${cmd_args[@]}" "${template}"
+    else
+        cat "${template}"
+    fi
+    log info "Process completed, exiting..."
+}
+
+function EditTemplate() {
+    export EDITOR
+    local BACKUP="" temp_file=""
+    BACKUP="${TEMPLATE_FILE}_$(date +%s).bak"
+    temp_file="$(mktemp -t template.XXXX)"
+
+    log info "Edit template: $(ColorPath "${TEMPLATE_FILE}")"
+    cp "${TEMPLATE_FILE}" "${temp_file}"
+    "${EDITOR:-"vim"}" "${temp_file}"
+
+    if ! cmp -s "${TEMPLATE_FILE}" "${temp_file}"; then
+        log info "New changes:"
+        diff --color=auto "${TEMPLATE_FILE}" "${temp_file}" || true
+        log info "Copying last changes: ${LIGHT_GREEN}${TEMPLATE_FILE}${NC} ==> $(ColorPath "${BACKUP}")"
+        cp "${TEMPLATE_FILE}" "${BACKUP}"
+        mv "${temp_file}" "${TEMPLATE_FILE}"
+    else
+        log info "No changes made"
+    fi
+    rm -f "${temp_file}" &> /dev/null || true
+}
+
+function Interactive_review() {
+    local dir="${1}"
+    cd "${dir}" || { log error "failed to enter '${dir}' directory"; return 1; }
+
+    log info "Interactive review: Use Enter to select/view, 'r' to refresh list, 'q' to quit."
+
+    while true; do
+        local selected=""
+        selected=$( \
+            fzf \
+            --height=50% \
+            --border \
+            --prompt="Select file: " \
+        )
+
+        if [[ -n "${selected}" ]]; then
+            log info "Viewing: ${selected} (press 'q' in less to return, or Ctrl+C to force quit)"
+            ShowJournal "${dir}/${selected}" | less -c -
+            printf '\x1b[1A\x1b[2K'
+        else
+            log error "No file selected. Press 'r' to retry or 'q' to quit."
+        fi
+
+        if ! read -t 0.1 -n1 -r key; then
+            key=""
+        fi
+        case "${key}" in
+            q|Q) echo " Quitting."; return 0 ;;
+            r|R) continue ;;
+        esac
+        printf '\n'
+    done
+}
+function EditJournal() {
+    local journal_file="${1}"
+    local editor="${2}"
+    local journal_dir="${journal_file%%/"${journal_file##*/}"}"
+    local journal_file_name="${journal_file##*/}"
+    TEMP_FILE="${journal_dir}/.${journal_file_name}.tmp"
+
+    if [[ -n "${editor}" ]]; then
+        command -v "${editor}" &> /dev/null || {
+            log info "editor '${editor^}' not found faling back to vim"
+            editor="vim"
+        }
+    fi
+
+    [[ -s "${TEMPLATE_FILE}" ]] || {
+        printf '%s\n' "Template here" > "${TEMPLATE_FILE}"
+    }
+
+    if [[ ! -s "${journal_file}" ]]; then
+        ### Fill the Journal with a template
+        local cmd_output="" template_temp_file=""
+        cmd_output="$(grep -Po '\$\(.*\)' "${TEMPLATE_FILE}" | sed 's@[\$\(\)]@@g' | sh || true)"
+        template_temp_file="$(mktemp)"
+        cp "${TEMPLATE_FILE}" "${template_temp_file}"
+        sed -i "s@\$\(.*\)@${cmd_output}@g" "${template_temp_file}"
+        EncodeTextFile "${template_temp_file}" "${journal_file}"
+        rm -f "${template_temp_file}" || true
+    fi
+
+    log info "Editor Initialized: ${editor^}"
+    if [[ "${editor}" == "vim" ]]; then
+        DecodeTextFile "${journal_file}" "${TEMP_FILE}"
+        log info "Edit temporary file '$(ColorPath "${TEMP_FILE}")'"
+        sleep 0.01; vim -c 'colorscheme slate' "${TEMP_FILE}"
+        Cleanup "${journal_file}"
+    else
+        DecodeTextFile "${journal_file}" "${TEMP_FILE}"
+        log info "Edit temporary file '$(ColorPath "${TEMP_FILE}")'"
+        sleep 0.01; "${editor:-"vim"}" "${TEMP_FILE}"
+        Cleanup "${journal_file}"
+    fi
+
+    log info "Process completed, exiting..."
+}
+
+function Usage() {
+    printf "%b\n" \
+        "" \
+        " ${GREEN}Usage:${NC} JournalToday [OPTIONS] [EDITOR]" \
+        "" \
+        " ${MUDDY}Options:${NC}" \
+        "   ${GREEN}-s, --show${NC}             Show current journal" \
+        "   ${GREEN}-e, --edit${NC}             Edit current journal" \
+        "   ${GREEN}-t, --edit-template${NC}    Edit current journal template" \
+        "   ${GREEN}-j, --journal${NC}          Specify a journal file" \
+        "   ${GREEN}-r, --review${NC}           Intaractive Review mode (using pager)" \
+        "   ${GREEN}-v, --verbose${NC}          Verbose mode on" \
+        "   ${GREEN}-h, --help${NC}             Show this" \
+        "" \
+        " ${MUDDY}EDITORs:${NC}" \
+        "   ${GREEN}vim | nvim | nano | micro${NC}   Edit journal using one of these" \
+        ""
+}
+
+function main() {
+    local -a args=("$@")
+
+    local editor="" journal_dir="" journal_file=""
+    journal_dir="${HOME}/journalDir"
+    journal_file="${journal_dir}/logs/$(date +%d-%b-%Y_).md"
+
+    local -i edit_journal=0 edit_template=0
+    local -i show_journal=0 show_template=0
+    local -i review_journal=0 interactive_mode=0
+
+    local -g verbose=0
+    local -g TEMPLATE_FILE="${journal_dir}/.template"
+    local -g TRANSFORM_KEY="${HOME}/.custom/${0##*/}/substitution_cipher"
+    local -g TEMP_FILE=""
+
+    mkdir -p "${TRANSFORM_KEY%%/"${TRANSFORM_KEY##*/}"}"
+
+    [[ ! -s "${TRANSFORM_KEY}" ]] && CreateNewKey
+
+    TRANSFORM_KEY="$(cut -d' ' -f1 "${TRANSFORM_KEY}")"
+
+    [[ -n "${TRANSFORM_KEY}" ]] || { log error "Transform_key is empty"; return 1; }
+
+    if [[ ! -d "${journal_dir}" ]]; then
+        { mkdir -p "${journal_dir}" && \
+            { log info "Created new journal directory: '${journal_dir}'"; }; } || \
+                { log error "Failed to create directory: '${journal_dir}'"; }
+    fi
+
+    [[ -s "${TEMPLATE_FILE}" ]] || { log error "You are missing template file: '${TEMPLATE_FILE}'"; }
+
+    set_value() {
+        local -n var_ref=${1}
+        local value="${2}"
+        [[ -n "${value}" ]] || { log error "'${var_ref}' requires a value"; return 1; }
+        var_ref="${value}"
+    }
+
+    for arg in "${args[@]}"; do
+        if [[ "${arg}" == *=* ]]; then
+            IFS=$'=' read -r arg value <<< "${arg}"
+        fi
+        case "${arg}" in
+            -e|-*edit|edit*) edit_journal=1 ;;
+            -t|-*edit*template|*edit*template*) edit_template=1 ;;
+            -*show*template|*show*template*) show_template=1 ;;
+            *vim|*micro|*nano) edit_journal=1 editor="${arg}" ;;
+            -*show*jour*|show*jour*|-*show|show) show_journal=1 ;;
+            -*review*|review*) show_journal=1 review_journal=1 ;;
+            -i|-*interactive*) interactive_mode=1 ;;
+            -v|-*verbose|verbose) verbose=1 ;;
+            -f*|*file|*journal|*sp*) set_value journal_file "${journal_dir}/spls/${value}" ;;
+            -h|--help|help*) Usage return 0 ;;
+            *)
+                [[ -s "${journal_dir}/logs/${arg}" ]] && { journal_file="${journal_dir}/logs/${arg}"; continue; }
+                [[ -s "${journal_dir}/spls/${arg}" ]] && { journal_file="${journal_dir}/spls/${arg}"; continue; }
+                log error "Invalid flag: '${arg}', use -h|--help for help"
+                log info "use --key=value like pairs"
+                ;;
+        esac
+    done
+
+    trap 'Cleanup "${journal_file}"; exit 0' SIGTERM SIGINT
+
+    if [[ $show_template -eq 1 ]]; then
+        [[ -s "${journal_file}" ]] || \
+            { log error "journal file '${journal_file}' doesn't exist"; return 1; }
+        ShowTemplate "${TEMPLATE_FILE}"
+    fi
+
+    if [[ $show_journal -eq 1 ]]; then
+        [[ -s "${journal_file}" ]] || \
+            { log error "journal file '${journal_file}' doesn't exist"; return 1; }
+        if [[ $review_journal -eq 1 ]]; then
+            ShowJournal "${journal_file}" | less -c -
+        else
+            ShowJournal "${journal_file}"
+        fi
+    fi
+
+    if [[ $interactive_mode -eq 1 ]]; then
+        Interactive_review "${journal_dir}"
+    fi
+
+    if [[ $edit_template -eq 1 ]]; then
+        [[ -s "${journal_file}" ]] || \
+            { log error "journal file '${journal_file}' doesn't exist"; return 1; }
+        EditTemplate "${TEMPLATE_FILE}"
+    fi
+
+    if [[ $edit_journal -eq 1 ]]; then
+        EditJournal "${journal_file}" "${editor:-"${EDITOR:-"vim"}"}"
+    fi
+
+}
+
+main "$@"
+

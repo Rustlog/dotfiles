@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+function gen_mac() {
+    for i in {1..6}; do
+        printf '%.2s' "$(head -c1 /dev/urandom | openssl dgst -sha1 - | cut -d' ' -f2)"
+        { [[ $i -lt 6 ]] && printf :; } || printf '\n'
+    done
+}
+
+function main() {
+    printf '%s\n' "$(gen_mac)"
+}
+
+main "${@}"
+
