@@ -1,4 +1,7 @@
 " Plugin manager (vim-plug)
+
+source /usr/share/nvim/NVIM/plug.vim
+
 call plug#begin('/usr/share/nvim/NVIM')
     " Rust syntax and highlighting support
     Plug 'rust-lang/rust.vim'
@@ -86,7 +89,7 @@ set guicursor=n-v-c-sm:block
 set signcolumn=no
 " Enable 24-bit RGB color support for terminals
 set termguicolors
-" Set mouse to insert mode
+" Set mouse to insert mode (enables copying)
 set mouse=i
 " Enable cursorline (optional)
 set cursorline
@@ -98,10 +101,23 @@ set swapfile
 " Enable shada (persistent history and cursor position saving)
 set shada='1000,f0,h
 
-function! InstallPlug()
-    call system('curl -fLo "${XDG_DATA_HOME:-$HOME/.local/share}"/nvim/site/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim')
-endfunction
+let mapleader = '\'
 
+let g:vimspector_enable_mappings = 'HUMAN'
+
+" Install vim-plug (plugin manager)
+function! InstallPlug()
+    call system('curl -fsSLo /usr/share/nvim/NVIM/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim')
+endfunction
+command! InstallPlug call InstallPlug()
+
+" Uninstall/Remove Plug
+function! RemovePlug()
+    execute '!rm -r /usr/share/nvim/VIM'
+endfunction
+command! RemovePlug :call RemovePlug
+
+" Toggle wrap lines
 function! ToggleWrap()
     if &wrap
         set nowrap
@@ -109,37 +125,80 @@ function! ToggleWrap()
         set wrap
     endif
 endfunction
-
-" Run C++
-command! RunCpp w | execute '!gcc -x c++ -pedantic -std=c++20 -lstdc++ -fno-elide-constructors -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
-" Run C
-command! RunC w | execute '!gcc -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
-
-" call ToggleWrap()
 command! ToggleWrap :call ToggleWrap()
 
-" Install vim-plug (plugin manager)
-command! InstallPlug call InstallPlug()
+" Run C++ code
+command! RunCpp w | execute '!gcc -x c++ -pedantic -std=c++20 -lstdc++ -fno-elide-constructors -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
+
+" Run C code
+command! RunC w | execute '!gcc -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
 
 " Abort the commit message
 command! GitAbort : !mv "%" "%.bak" | :q!
-
-let mapleader = '\'
-
-let g:vimspector_enable_mappings = 'HUMAN'
 
 " Automatically jump to the last cursor position when reopening a file
 autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") | exe "normal! g`\" | zz" | endif
 " autocmd BufRead,BufNewFile *.conf set filetype=dosini
 
 " C tmeplate
-autocmd BufNewFile *.c call setline(1, ["# include <stdio.h>", "", "# define EXIT_SUCCESS 0", "# define EXIT_FAILURE 1", "", "int main(void) {", "    printf(\"\\n\");", "    return EXIT_SUCCESS;", "}", ""])
+autocmd BufNewFile *.c call setline(1, [
+    \ '//usr/bin/env gcc -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '',
+    \ '# include <stdio.h>',
+    \ '',
+    \ '# define EXIT_SUCCESS 0',
+    \ '# define EXIT_FAILURE 1',
+    \ '',
+    \ 'int main(void) {',
+    \ '    printf("Hello World!\n");',
+    \ '    return EXIT_SUCCESS;',
+    \ '}',
+    \ ''
+\])
+
 " C++ tmeplate
-autocmd BufNewFile *.cpp,*.cxx,*.cc,*.c++ call setline(1, ["# include <iostream>", "", "# define EXIT_SUCCESS 0", "# define EXIT_FAILURE 1", "", "int main(void) {", "    std::cout << '\\n';", "    return EXIT_SUCCESS;", "}", ""])
+autocmd BufNewFile *.cpp,*.cxx,*.cc,*.c++ call setline(1, [
+    \ '//usr/bin/env gcc -lstdc++ -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '',
+    \ '# include <iostream>',
+    \ '',
+    \ '# define EXIT_SUCCESS 0',
+    \ '# define EXIT_FAILURE 1',
+    \ '',
+    \ 'int main(void) {',
+    \ "    std::cout << \"Hello World!\" << '\\n';",
+    \ '    return EXIT_SUCCESS;',
+    \ '}',
+    \ ''
+\])
+
 " Python tmeplate
-autocmd BufNewFile *.py call setline(1, ["#!/usr/bin/env python3", "", "def main():", "    print()", "","if __name__ == '__main__':", "    main()", ""])
+autocmd BufNewFile *.py call setline(1, [
+    \ "#!/usr/bin/env python3",
+    \ "",
+    \ "def main():",
+    \ "    print()",
+    \ "",
+    \ "if __name__ == '__main__':",
+    \ "    main()",
+    \ ""
+\])
+
 " Bash tmeplate
-autocmd BufNewFile *.sh call setline(1, ["#!/usr/bin/env bash", "", "set -euo pipefail", "", "function main() {", "    echo HELLO", "}", "", "main \"$@\"", ""])
+autocmd BufNewFile *.sh call setline(1, [
+    \ '#!/usr/bin/env bash',
+    \ '',
+    \ 'set -euo pipefail',
+    \ '',
+    \ 'function main() {',
+    \ '    echo "Hello World!"',
+    \ '}',
+    \ '',
+    \ 'main "${@}"',
+    \ ''
+\])
+
 " auto chmod logic
 autocmd BufWritePost *.sh,*.py if getline(1) =~ '^#!' | silent !chmod +x '%' | endif
+autocmd BufWritePost *.c,*.cpp,*.cxx,*.cc,*.c++ silent !chmod +x '%'
 

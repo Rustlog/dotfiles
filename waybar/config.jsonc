@@ -242,7 +242,7 @@
         "format-bluetooth-muted": " {icon}  {format_source}",
         "format-muted": "  {format_source}",
         "format-source": "{volume}%  ",
-        "on-click": "XDG_CURRENT_DESKTOP=kde GTK_THEME=Adwaita:dark pavucontrol",
+        "on-click": "env GTK_THEME=Breeze:dark XDG_CURRENT_DESKTOP=kde pavucontrol",
         "on-click-right": "XDG_CURRENT_DESKTOP=kde blueman-manager",
         "format-source-muted": " ",
             "format-icons": {

@@ -1,8 +1,5 @@
 /*Colorschemes, there are Gruvbox, Tokyo Night, and Everforest by default. The way it works is whichever colorscheme section is defined last will be used. Here everforest is last, but put any one you want to use as the last one.*/
 
-
-
-
 /* Everforest Dark Colors */
 @define-color background #2b3339;
 @define-color background-light #323c41;

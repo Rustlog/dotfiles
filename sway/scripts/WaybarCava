@@ -6,15 +6,14 @@ LOGGING=0
 
 # logger
 function log() {
-    local type_="${1}"
-    shift
+    local type_="${1}"; shift
     [[ $LOGGING -eq 1 ]] && printf '[%s]: %s\n' "${type_}" "${*}" 1>&2
     printf '[%s]: %b\n' "${type_}" "${*}" &>> "${work_dir}/waybar_.log"
 }
 
 function KILL_childs_processes() {
-    pgrep -f "*${0}" | grep -v "^$$" | xargs -r kill -SIGINT || true
-    pkill -f "cava -p ${work_dir}/cava_visualizer_X_.*.fifo.*" || true
+    { pgrep -f ".*${0}" | grep -v "^$$" | xargs -r kill -SIGINT; } 2>/dev/null || true
+    { pkill -f "cava -p ${work_dir}/cava_visualizer_X_.*.fifo.*"; } 2>/dev/null || true
 }
 
 # write a fresh configuration for cava
@@ -73,14 +72,15 @@ function CleanUP() {
     local config="${2:-""}"
     local -n ref_pids=${3}
 
-    [[ -p "${pipe}" ]] && { rm -f "${pipe}" || log error "Failed to pipe '${pipe}'"; }
-    [[ -f "${config}" ]] && { rm -f "${config}" || log error "Failed to config '${config}'"; }
+    [[ -p "${pipe}" ]] && { rm -f "${pipe}" || log error "Failed to clean pipe '${pipe}'"; }
+    [[ -f "${config}" ]] && { rm -f "${config}" || log error "Failed to clean config '${config}'"; }
 
     for pid in "${ref_pids[@]}"; do
         if ps -p "${pid}" &> /dev/null; then
             kill -SIGINT "${pid}" || log error "Failed to kill '${pid}'";
         fi
     done
+    pkill -f "cava -p ${config}" || true
 }
 
 # bar characters (represents visualizer levels)
@@ -89,7 +89,7 @@ function SetBar() {
     local -n cava_bar_ref=${2}
     local -n noise_level_ref=${3}
     local -n dict_ref=${4}
-    local -i use_bar_num=${5:-0}
+    local -i use_bar_num=${5:-1}
     local -i bar_len=${6:-4}
 
     case ${use_bar_num} in
@@ -134,17 +134,12 @@ function ToggleBar() {
 
     ## re-start cava
     pkill -f "cava -p ${config_file_ref}" || { log error "Failed to kill cava"; return 1; }
-    log info "content of config file: '${config_file_ref}'"
-    cat "${config_file_ref}"
-    if ! cava -p "${config_file_ref}" & then
-        log error "Failed to start cava with config '${config_file_ref}'"
-    fi
+    cava -p "${config_file_ref}" &
     ## we don't need configuration now
     (sleep 0.4 && rm -f "${config_file_ref}")
 }
 
 function main() {
-
     local -a args=("${@}")
     # global vars
     local -g work_dir="/tmp/waybar/${0##*/}"
@@ -152,7 +147,7 @@ function main() {
     # a temporary file for uniqueness
     tmp="${work_dir}/cava_visualizer_X_$(hexdump -n2 -ve '/1 "%02x"' /dev/urandom).fifo"
     # create cava config
-    local config_file="${tmp}.config"
+    local config_file="${tmp}_config"
     # output Pipe
     local pipe="${tmp}"
     # ASCII characters
@@ -167,15 +162,15 @@ function main() {
     local -i framerate=36
     # change the length of cava visualizer
     local -i bar_len=4
-    # bar style (3rd is default)
-    local -i use_bar_num=3
+    # bar style (1rd is default)
+    local -i use_bar_num=1
 
     local -a pids=()
 
     for ((i=0;i<${#args[@]};i++)); do
         arg="${args[$i]}"
         [[ $i -eq 0 && "${arg}" =~ ^[0-9]$ ]] && { [[ "${arg}" -ne 0 ]] && use_bar_num=${arg}; continue; }
-        [[ $i -eq 1 && "${arg}" =~ ^[0-9]+$ ]] && { [[ "${arg}" -ge 10 ]] && framerate=${arg}; continue; }
+        [[ $i -eq 1 && "${arg}" =~ ^[0-9]+$ ]] && { [[ "${arg}" -ne 0 ]] && framerate=${arg}; continue; }
         [[ $i -eq 2 && "${arg}" =~ ^[0-9]+$ ]] && { [[ "${arg}" -ne 0 ]] && bar_len=${arg}; continue; }
         case "${arg}" in
             -h|--help|help) Usage; return 0 ;;
@@ -210,24 +205,24 @@ function main() {
     pids+=($!)
 
     ## we don't need configuration now
-    (sleep 0.4 && rm "${config_file}")
+    (sleep 0.4 && rm -f "${config_file}")
 
     # when your are done just clean the mess
-    trap "CleanUP ${pipe} ${config_file} pids; exit" EXIT SIGINT SIGTERM SIGHUP
+    trap "CleanUP ${pipe} ${config_file} pids; exit" EXIT SIGINT SIGTERM
     # trap SIGUSR1 to toggle next bar
     trap 'ToggleBar bar cava_bar noise_level dict use_bar_num config_file pipe bar_len framerate' SIGUSR1
 
     ## read stdout from cava, transform output, and check for activity
-    local visualizer_output
+    local visualizer_output=""
     while read -r line < "${pipe}" || true; do
-        visualizer_output=$(echo "${line}" | sed -u "${dict}")
+        visualizer_output=$(printf '%s\n' "${line}" | sed -u "${dict}")
         # detect if there's any visualizer activity (i.e., non-empty output)
         if [[ -n "${visualizer_output}" && "${visualizer_output}" != "${cava_bar}" ]]; then
             # JSON output with a class to enable dynamic output
-            echo "{\"text\": \"${visualizer_output}\", \"class\": \"active\"}"
+            printf '%s\n' "{\"text\": \"${visualizer_output}\", \"class\": \"active\"}"
         else
             # JSON output with a class indicating idle state
-            echo "{\"text\": \"${visualizer_output}\", \"class\": \"inactive\"}"
+            printf '%s\n' "{\"text\": \"${visualizer_output}\", \"class\": \"inactive\"}"
         fi
     done
 }

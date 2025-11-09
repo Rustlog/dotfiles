@@ -394,7 +394,7 @@ function main() {
                 EditConfig "${CONFIG_FILE}"
                 return 0
                 ;;
-            -s|-*show|show)
+            -s|-*show*|show*)
                 show_config=1
                 ;;
             -c|--clone*|clone*)
@@ -427,6 +427,7 @@ function main() {
             -h|-*help|help) show_help=1 ;;
             *)
                 log error "Invalid flag: $arg"
+                return 1
                 ;;
         esac
     done

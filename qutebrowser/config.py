@@ -1,118 +1,128 @@
 #!/usr/bin/env python3
 
+import os
+
+set  = config.set
+bind = config.bind
+
+os.environ["QT_QPA_PLATFORM"]         = "wayland"
+os.environ["QT_QPA_PLATFORMTHEME"]    = "gtk3"
+
 config.load_autoconfig(False)
 
-### Custom keybindings
-config.bind('<', 'back')
-config.bind('>', 'forward')
-config.bind('<Ctrl+Shift+H>', 'tab-move +1')
-config.bind('<Ctrl+Shift+L>', 'tab-move -1')
-config.bind('<Shift+E>', 'edit-url')
+# Colors
+set("colors.statusbar.normal.bg",   "#1A1A1A")
+set("colors.statusbar.normal.fg",   "#CCCCCC")
+set("colors.statusbar.insert.bg",   "#0066CC")
+set("colors.statusbar.insert.fg",   "#FFFFFF")
+set("colors.statusbar.command.bg",  "#1A1A1A")
+set("colors.statusbar.command.fg",  "#FFFFFF")
+set("colors.tabs.indicator.stop",   "#00FFAA")
 
-# Edit the url with vim
-c.editor.command = ["foot", "vim", "{file}"]
+# Keybindings
+bind("<Ctrl+Shift+H>",  "tab-move +1" )
+bind("<Ctrl+Shift+L>",  "tab-move -1" )
+bind("<Shift+E>",       "edit-url"    )
+bind("<Ctrl+M>",        "tab-mute"    )
+bind("<Ctrl+=>",        "zoom-in"     )
+bind("<Ctrl+->",        "zoom-out"    )
+bind("td",              "config-cycle -u '{url}' -t colors.webpage.darkmode.enabled true false ;; reload" )
+bind("tD",              "config-cycle -t colors.webpage.darkmode.enabled true false"                      )
 
-# content blocking
-c.content.blocking.enabled = True
+# Set Font
+set("fonts.default_family", [ "SourceCodePro" ]    )
+set("fonts.web.family.fixed",       "SourceCodePro" )
+set("fonts.web.family.sans_serif",  "SourceCodePro" )
+set("fonts.web.family.serif",       "SourceCodePro" )
+set("fonts.web.family.standard",    "SourceCodePro" )
+set("fonts.default_size",           "10pt"          )
+set("fonts.default_size",           "16px"          )
 
-# Unset the defualt startpage
-c.url.start_pages = "about:blank"
-c.url.default_page = "about:blank"
+# Zoomlevels
+set("zoom.levels", [
+    "10%",  "20%",  "30%",  "40%",  "50%",  "60%",
+    "70%",  "80%",  "90%",  "100%", "110%", "120%",
+    "130%", "140%", "150%", "160%", "170%", "180%",
+    "190%", "200%", "210%", "220%", "220%", "230%",
+    "240%", "250%", "260%", "270%", "280%", "290%",
+    "300%", "310%", "320%", "230%", "340%", "350%",
+    "360%", "270%", "380%", "390%", "400%", "410%",
+    "420%", "430%", "440%", "450%", "460%", "470%",
+    "480%", "490%", "500%", "510%", "520%", "530%",
+    "540%", "550%", "560%", "570%", "580%", "590%",
+    "600%", "610%", "620%", "630%", "640%", "650%",
+    "670%", "680%", "690%", "700%", "710%", "720%",
+])
 
-c.tabs.title.format = "{audio}{current_title}"
-c.fonts.web.size.default = 20
+# Content-blocking
+set("content.blocking.enabled", True    )
+set("content.blocking.method", "both"   )
+set("content.blocking.adblock.lists", [
+    "https://ublockorigin.pages.dev/filters/filters.min.txt",
+    "https://ublockorigin.pages.dev/filters/badware.min.txt",
+    "https://ublockorigin.pages.dev/filters/privacy.min.txt",
+    "https://ublockorigin.pages.dev/filters/unbreak.min.txt",
+    "https://ublockorigin.pages.dev/filters/quick-fixes.min.txt",
+    "https://ublockorigin.pages.dev/filters/annoyances.min.txt",
+    "https://ublockorigin.pages.dev/filters/annoyances-cookies.txt",
+    "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/thirdparties/easylist.txt",
+    "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/thirdparties/easyprivacy.txt",
+    "https://easylist-downloads.adblockplus.org/indianlist.txt",
+    "https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/thirdparties/easylist-annoyances.txt",
+])
 
-## Define search engines
-c.url.searchengines = {
-        'DEFAULT': 'https://duckduckgo.com/?q={}',
-        '!g': 'https://www.google.com/search?q={}',
-        '!go': 'https://www.google.com/search?q={}',
-        '!aw': 'https://wiki.archlinux.org/?search={}',
-        '!apkg': 'https://archlinux.org/packages/?sort=&q={}&maintainer=&flagged=',
-        '!gh': 'https://github.com/search?o=desc&q={}&s=stars',
-        '!yt': 'https://www.youtube.com/results?search_query={}',
-}
+set("content.blocking.hosts.lists", [
+    "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext",
+])
 
-# save tabs on quit/restart
-c.auto_save.session = True
-# Private browsing
-c.content.private_browsing = True
+set("content.canvas_reading", False)
 
-c.completion.open_categories = ['searchengines', 'quickmarks', 'bookmarks', 'history', 'filesystem']
+# Set environment
+set("url.default_page",         "about:blank"    )
+set("url.start_pages",          "about:blank"    )
+set("auto_save.session",        True             )
+set("content.geolocation",      False            )
+set("content.private_browsing", True             )
+set("content.autoplay",         False            )
+set("fonts.web.size.default",   20               )
+set("tabs.width",               "4%"             )
+set("editor.command", ["foot", "--app-id", "solid_f", "vim", "{file}"]          )
+set("tabs.title.format",        "{audio}{index}: {current_title:.30}{private}"  )
+set("content.headers.user_agent",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36")
 
-# keybinding changes
-# config.bind('=', 'cmd-set-text -s :open')
-# config.bind('h', 'history')
-# config.bind('cs', 'cmd-set-text -s :config-source')
-# config.bind('tH', 'config-cycle tabs.show multiple never')
-# config.bind('sH', 'config-cycle statusbar.show always never')
-# config.bind('T', 'hint links tab')
-# config.bind('pP', 'open -- {primary}')
-# config.bind('pp', 'open -- {clipboard}')
-# config.bind('pt', 'open -t -- {clipboard}')
-# config.bind('qm', 'macro-record')
-# config.bind('<ctrl-y>', 'spawn --userscript ytdl.sh')
-# config.bind('tT', 'config-cycle tabs.position top left')
-# config.bind('gJ', 'tab-move +')
-# config.bind('gK', 'tab-move -')
-# config.bind('gm', 'tab-move')
+set("content.headers.custom", {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "accept-encoding": "gzip, deflate, br",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "none",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1"
+})
 
-# dark mode setup
-c.colors.webpage.darkmode.enabled = True
-# c.colors.webpage.darkmode.algorithm = 'lightness-cielab'
-# c.colors.webpage.darkmode.policy.images = 'never'
-# config.set('colors.webpage.darkmode.enabled', False, 'file://*')
+# Request or force dark theme on sites
+set("colors.webpage.bg", "black")
+set("colors.webpage.preferred_color_scheme", "dark" )
+force_dark_on = [
+    "https://*.google.com/*",
+    "qute://bookmarks",
+    "qute://bindings",
+    "qute://settings",
+    "qute://version",
+    "qute://history",
+    "qute://help",
+    "qute://gpl",
+]
+for site in force_dark_on:
+    set("colors.webpage.darkmode.enabled", True, site)
 
-# styles, cosmetics
-# c.content.user_stylesheets = ["~/.config/qutebrowser/styles/youtube-tweaks.css"]
-# c.tabs.padding = {'top': 5, 'bottom': 5, 'left': 9, 'right': 9}
-# c.tabs.indicator.width = 0 # no tab indicators
-# c.window.transparent = True # apparently not needed
-c.tabs.width = '4%'
+# Default search engines
+set("url.searchengines", {
+    "DEFAULT": "https://startpage.com/sp/search?q={}",
+    "!g": "https://www.google.com/search?q={}",
+    "!d": "https://duckduckgo.com/search?q={}",
+    "!s": "https://startpage.com/sp/search?q={}",
+    "!gh": "https://github.com/search?o=desc&q={}&s=stars",
+    "!yt": "https://www.youtube.com/results?search_query={}",
+})
 
-# fonts
-c.fonts.default_family = []
-c.fonts.default_size = '10pt'
-c.fonts.web.family.fixed = 'monospace'
-c.fonts.web.family.sans_serif = 'monospace'
-c.fonts.web.family.serif = 'monospace'
-c.fonts.web.family.standard = 'monospace'
-
-# privacy - adjust these settings based on your preference
-# config.set("completion.cmd_history_max_items", 0)
-# config.set("content.private_browsing", True)
-# config.set("content.webgl", False, "*")
-# config.set("content.canvas_reading", False)
-config.set("content.geolocation", False)
-# config.set("content.webrtc_ip_handling_policy", "default-public-interface-only")
-# config.set("content.cookies.accept", "all")
-# config.set("content.cookies.store", True)
-# config.set("content.javascript.enabled", False) # tsh keybind to toggle
-
-# Adblocking info -->
-# For yt ads: place the greasemonkey script yt-ads.js in your greasemonkey folder (~/.config/qutebrowser/greasemonkey).
-# The script skips through the entire ad, so all you have to do is click the skip button.
-# Yeah it's not ublock origin, but if you want a minimal browser, this is a solution for the tradeoff.
-# You can also watch yt vids directly in mpv, see qutebrowser FAQ for how to do that.
-# If you want additional blocklists, you can get the python-adblock package, or you can uncomment the ublock lists here.
-c.content.blocking.enabled = True
-# c.content.blocking.method = 'adblock' # uncomment this if you install python-adblock
-# c.content.blocking.adblock.lists = [
-#         "https://github.com/ewpratten/youtube_ad_blocklist/blob/master/blocklist.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/legacy.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/filters.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/filters-2020.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/filters-2021.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/filters-2022.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/filters-2023.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/filters-2024.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/badware.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/privacy.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/badlists.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/annoyances.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/annoyances-cookies.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/annoyances-others.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/badlists.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/quick-fixes.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/resource-abuse.txt",
-#         "https://github.com/uBlockOrigin/uAssets/raw/master/filters/unbreak.txt"]

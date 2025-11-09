@@ -1,6 +1,6 @@
-# Personal Arch Linux dotfiles
+# Personal dotfiles
 
-## This is my personal configuration file repository for my Arch Linux setup.
+## This is my personal configuration file repository for my Void Linux setup.
 
 #### Core configuration (Main setup):
 - **Sway**: [~/.config/sway/config](sway/config)
@@ -24,22 +24,36 @@
 ### Tree view
 [Rustlog](https://github.com/Rustlog/dotfiles)
 ```
-├── sway/        # Sway WM config and scripts
-├── waybar/      # Waybar status bar config
-├── neovim/      # Neovim config
-├── vim/         # Vim config
-├── foot/        # Foot terminal config
-├── shell/       # Shell configs (bash and zsh)
-├── scripts/     # Handy scripts (PlayMusic, MountSSH, etc.)
-├── ArchSetup/   # Arch install/setup scripts
-├── wofi/        # Wofi launcher config
-├── i3/          # i3 WM config (not used often)
-├── hyprland/    # Hyprland WM config (not used often)
-├── alacritty/   # Alacritty terminal config (not used often)
-├── qutebrowser/ # Qutebrowser config (not used often)
-├── kitty/       # Kitty terminal config (not used often)
-├── yazi/        # Yazi file manager config
-└── README.md
+~-- sway/                       # Sway WM config and scripts
+|   |-- lock_screen/
+|   |-- scripts/
+|   `-- waybar/
+|-- i3/                         # Old i3
+|   `-- wallpapers/
+|-- scripts/                    # Personal configs
+|   |-- main/
+|   `-- other/
+|-- shell/
+|-- waybar/                     # Waybar status bar config
+|   `-- scripts/
+|-- neovim/                     # Neovim config
+|-- vim/                        # Vim config
+|-- foot/                       # Foot terminal
+|-- alacritty/                  # Alacritty
+|-- bootstrap/                  # Bootstrap scripts for void and arch
+|   |-- arch/
+|   `-- void/
+|-- fuzzel/                     # Application launcher
+|-- hyprland/                   # Dynamic tiling WM
+|   |-- scripts/
+|   `-- waybarconfig/
+|-- qutebrowser/                # Vim like browser
+|
+~-- templates_configs_scripts/  # Any code or script template goes here
+    |-- automation_scripts/
+    |-- code_templates/
+    `-- system_configs/
+
 ```
 
 ### Main dotfile manager

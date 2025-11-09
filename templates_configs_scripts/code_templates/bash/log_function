@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+builtin set -euo pipefail
+
+function log() {
+    local _type="${1}"; shift
+    local _color="" _t=""
+    local -g info_color="\033[38;2;85;255;126m" \
+        warn_color="\033[38;2;255;170;10m" \
+        error_color="\033[38;2;244;29;31m" \
+        fatal_color="\033[5m\033[38;2;255;0;0m" \
+        other_color="\033[38;2;251;255;208m" \
+        nc="\033[0m"
+    case "${_type}" in
+        info) _color="${info_color}" _t="*" ;;
+        warn) _color="${warn_color}" _t="^" ;;
+        error) _color="${error_color}" _t="!" ;;
+        fatal) _color="${fatal_color}" _t="#" ;;
+        *) _color="${other_color}" _t="" ;;
+    esac
+
+    printf "[%b%s%b%s]: %b\n" "${_color}" "${_type}" "${nc}" "${_t}" "${*}"
+}
+
+function main() {
+    log info "This is INFO"
+    log warn "This is WARNING"
+    log error "This is ERROR"
+    log fatal "This is FATAL"
+    log other "This is OTHER"
+}
+
+main "${@}"
+

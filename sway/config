@@ -45,8 +45,8 @@ bar {
     #* All Keyboards
     input type:keyboard {
         xkb_layout us,es,ru
-        repeat_delay 160
         repeat_rate 60
+        repeat_delay 160
     }
 
     #* All Pointer devices
@@ -127,11 +127,20 @@ bar {
     exec nm-applet --indicator
 
     # XDG desktop fixes
-    exec /usr/lib/xdg-desktop-portal-wlr &
-    exec /usr/lib/xdg-desktop-portal -r
+    exec /usr/lib*/xdg-desktop-portal-wlr
+    exec /usr/lib*/xdg-desktop-portal -r
 
     # GTK Theme
-    exec gsettings set org.gnome.desktop.interface gtk-theme Breeze
+    set $schema org.gnome.desktop.interface
+    exec {
+        gsettings set $schema color-scheme          "prefer-dark"
+        gsettings set $schema gtk-theme             "breeze-dark"
+        gsettings set $schema icon-theme            "breeze-dark"
+        gsettings set $schema font-name             "Roboto Mono 11"
+        gsettings set $schema font-antialiasing     "rgba"
+        gsettings set $schema enable-animations     "false"
+        gsettings set $schema text-scaling-factor   "1.0"
+    }
 
     # Set default volume, mute mic and brightness
     exec bash -c ' \
@@ -165,7 +174,6 @@ bar {
     # Border of floating window
         for_window [class=".*"] default_floating_border pixel 1
     # Transparancy levels for applications
-        for_window [app_id="^foot$"] opacity 0.97
         for_window [app_id="waterfox*|vivaldi*|Alacritty*|mpv*|imv*|org.pulseaudio.*"] opacity 1
         for_window [app_id="^(journal|solid|solid_f|org.qutebrowser.qutebrowser)$"] opacity 1
         for_window [class="Opera*|feh*|guvcview*|qutebrowser"] opacity 1
@@ -478,7 +486,7 @@ bar {
                             "--pixel-format=yuv420p" \
                             "--framerate=60" \
                             "--audio=$(pactl get-default-sink).monitor" \
-                            "--geometry=$(slurp -b=aaccbb11)" \
+                            "--geometry=$(slurp -b aaccbb11)" \
                             "--file=${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv" \
                         ); \
                     fi; \
@@ -505,7 +513,7 @@ bar {
                 bindsym $mod+Shift+S exec bash -c ' \
                     DIR="${HOME}/media/Grim_Screenshots"; \
                     [[ -d "${DIR}" ]] || mkdir -p "${DIR}"; \
-                    grim -g "$(slurp -b=aaccbb11)" "${DIR}/$(date +%d-%b-%Y_%T).png" \
+                    grim -g "$(slurp -b aaccbb11)" "${DIR}/$(date +%d-%b-%Y_%T).png" \
                 '
 
         # Edit this (sway config) with neovim or vim
@@ -541,7 +549,7 @@ bar {
         # Hybrid sleep, like sleep but cooler (Mod+Alt+S)
             bindsym $mod+Alt+S      exec systemctl hybrid-sleep --now
 
-        # What's my selected screen resolution? (Mod+Shift+G)
+        # Grab selected screen resolution? (Mod+Shift+G)
             bindsym $mod+Shift+G  exec bash -c ' \
                 res="$(slurp -b aaccbb11)"; \
                 notify-send -t 8000 "${res}"; \
@@ -552,7 +560,7 @@ bar {
             bindsym $mod+grave+V exec rofi -modi emoji -show emoji
 
         # Select and set wallaper
-        bindsym $mod+W+Space exec foot --app-id=floating -w 1200x600 bash -c ' \
+        bindsym $mod+Space+W exec foot --app-id=floating -w 1200x600 bash -c ' \
             dir="${HOME}/.local/share/wallpapers"; \
             cd "${dir}"; \
             selected="$(fzf --preview-window right:80% --preview="chafa --size=60x30 --animate=off {}")"; \

@@ -22,48 +22,60 @@ function Usage() {
     exit 0
 }
 
+function ColorPath() {
+    local blue="\033[38;2;150;134;255m" nc="\033[0m"
+    sed -e "s@${HOME}@${blue//\\/\\\\}~${nc//\\/\\\\}@g" <(printf "%s\n" "${1}")
+}
+
 function main() {
     # Default configuration
+    local -a args=("${@}")
     local concurrent_downloads=4
-    local download_directory="$(realpath .)"
-    local playlist_url=""
+    local download_directory=""
+    local playlist_url="${args[$((${#args[@]}-1))]}"
+    args=("${args[@]:0:$((${#args[@]}-1))}")
 
     # Argument parsing
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -o)
-                shift
-                [[ -z "$1" ]] && ERROR "Missing directory after -o"
-                download_directory="$(realpath "$1")"
-                ;;
-            -h|--help)
-                Usage
-                ;;
-            *)
-                playlist_url="$1"
-                ;;
+    local arg="" value="" next_arg=""
+    for ((i=0;i<${#args[@]};i++)); do
+        arg="${args[$i]}"
+        next_arg="${args[$((i+1))]:-""}"
+        [[ "${next_arg}" != -* ]] && i=$((i+1)) value="${next_arg}"
+        if [[ "${arg}" == *=* ]]; then
+            IFS=$'=' read -r arg value <<< "${arg}"
+            [[ -n "${value}" ]] || ERROR "'${arg}' requires a value"
+        fi
+        case "${arg}" in
+            -d) download_directory="${value}" ;;
+            -h|--help) Usage ;;
+            *) ERROR "Unknown argument: '${arg}'" ;;
         esac
-        shift
     done
 
-    # Checks
-    [[ -z "$playlist_url" ]] && ERROR "No playlist URL provided."
-    [[ ! -d "${download_directory}" ]] && ERROR "Directory '${download_directory}' doesn't exist."
-    cd "${download_directory}" || ERROR "Cannot change directory '${download_directory}'"
+    # [[ -n "${playlist_url}" ]] || ERROR "No playlist URL given."
+    [[ -d "${download_directory}" ]] || ERROR "Directory ${download_directory@Q} doesn't exist."
 
-    # Start Download
-    INFO "Downloading into: ${download_directory}"
-    INFO "Playlist: ${playlist_url}"
+    cd "${download_directory}" || ERROR "Cannot change directory ${download_directory@Q}"
 
-    yt-dlp \
-        -f "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio" \
-        -N "$concurrent_downloads" \
-        --embed-thumbnail --convert-thumbnails jpg \
-        --add-metadata \
-        --metadata-from-title "%(artist)s - %(title)s" \
-        --yes-playlist \
-        -o "%(title).150s.%(ext)s" \
-        "$playlist_url"
+    local -a yt_dlp_args=(
+        "-f" "bestaudio"
+        "-N" "${concurrent_downloads}"
+        "--extract-audio"
+        "--add-metadata"
+        "--embed-thumbnail"
+        "--yes-playlist"
+        "--audio-quality" "0"
+        "--audio-format" "opus"
+        "--convert-thumbnails" "jpg"
+        "--metadata-from-title" "%(artist)s - %(title)s"
+        "-o" "%(title)s.%(ext)s"
+    )
+
+    INFO "Directory: '$(ColorPath "${download_directory}")'"
+    INFO "Url: '$(ColorPath "${playlist_url}")'"
+    INFO "Cmd: yt-dlp ${yt_dlp_args[*]} '$(ColorPath "${playlist_url}")'"
+
+    yt-dlp "${yt_dlp_args[@]}" "${playlist_url}"
 }
 
 main "$@"

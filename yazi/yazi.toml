@@ -5,13 +5,13 @@ edit = [
     { run = '${EDITOR:-vim} -- "$@"',                       desc = "env EDITOR", block = true, for = "unix" },
 ]
 bat_cat = [
-    { run = 'bat --paging=always --theme-dark=TwoDark --decorations=never --color=always -- "$@" || less -- "$@"', desc = "Pager (bat|less)", block = true, for = "unix" },
+    { run = '{ bat --paging=never --theme-dark=TwoDark --decorations=never --color=always -- "$@" | less -c -; } || less -c -- "$@"', desc = "Pager (bat|less)", block = true, for = "unix" },
 ]
 open_pdf = [
     { run = 'okular "$@" & disown',                         desc = "Okular", for = "unix" },
 ]
 imv_feh = [
-    { run = 'imv -- "$@" || feh -- "$@"',                   desc = "Open Image", block = false, for = "unix" },
+    { run = 'command -v imv && viewer=imv || viewer=feh; ${viewer} -- "$@" & disown',                   desc = "Open Image", block = false, for = "unix" },
 ]
 xdg_open = [
     { run = 'xdg-open "$@" &',                              desc = "xdg open", for = "unix" },
@@ -23,7 +23,7 @@ extract = [
     { run = 'ya pub extract --list "$@"',                   desc = "Extract here", for = "unix" },
 ]
 mpv_vlc = [
-    { run = 'mpv --loop --vid=auto --audio=auto --audio-device=pulse --hdr-compute-peak --vo=gpu-next --gpu-api=vulkan --loop-playlist=inf --fullscreen --volume=65 --mute "$@" || cvlc "$@"',                                                          desc = "mpv", orphan = true, for = "unix" },
+    { run = '(command -v mpv &> /dev/null && mpv --loop --vid=auto --audio=auto --audio-device=pulse --hdr-compute-peak --vo=gpu-next --gpu-api=vulkan --loop-playlist=inf --fullscreen --volume=65 --mute "$@" 2> /dev/null) || vlc "$@" 2> /dev/null',                                                          desc = "mpv", orphan = true, for = "unix" },
 ]
 
 # Rules to open items

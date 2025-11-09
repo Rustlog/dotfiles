@@ -166,7 +166,7 @@ function main() {
     for ((i=0;i<${#args[@]};i++)); do
         arg="${args[$i]}"
         [[ $i -eq 0 && "${arg}" =~ ^[0-9]$ ]] && { [[ "${arg}" -ne 0 ]] && use_bar_num=${arg}; continue; }
-        [[ $i -eq 1 && "${arg}" =~ ^[0-9]+$ ]] && { [[ "${arg}" -ge 10 ]] && framerate=${arg}; continue; }
+        [[ $i -eq 1 && "${arg}" =~ ^[0-9]+$ ]] && { [[ "${arg}" -ne 0 ]] && framerate=${arg}; continue; }
         [[ $i -eq 2 && "${arg}" =~ ^[0-9]+$ ]] && { [[ "${arg}" -ne 0 ]] && bar_len=${arg}; continue; }
         case "${arg}" in
             -h|--help|help) Usage; return 0 ;;

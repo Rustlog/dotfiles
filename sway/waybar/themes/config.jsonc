@@ -59,8 +59,8 @@
 
     // Cava on the top
     "custom/cava": {
-        "exec": "$(find ~/.config/sway/ -type f -name WaybarCava) 1 32 8 2>/dev/null",
-        "on-click": "pkill -SIGUSR1 -f '.*scripts/WaybarCava 1 32 8'",
+        "exec": "$(find ~/.config/sway/ -type f -name WaybarCava) 0 32 8 2>/dev/null",
+        "on-click": "pkill -SIGUSR1 -f '.*scripts/WaybarCava 0 32 8'",
         "return-type": "json",
         "format": "{}"
     },

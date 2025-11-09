@@ -27,7 +27,7 @@ function toggle_theme() {
     pkill -x waybar || true
 
     if [[ $found_swww -eq 1 ]]; then
-        swww img "${background_img}" --transition-type fade
+        swww img "${background_img}" --transition-type fade --transition-duration 1
     else
         swaybg -o '*' -i "${background_img}" -m fill
     fi
