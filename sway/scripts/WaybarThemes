@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+function toggle_theme() {
+    local action="${1:-"reload_current"}"
+
+    local -i total_available_themes=3
+    local config_dir="${HOME}/.config/sway"
+    local waybar_config="" waybar_styles=""
+    local msg=""
+
+    if [[ "${action}" == "toggle_next" ]]; then
+        num=$(( (num % total_available_themes) + 1 ))
+        msg="Started Waybar with profile: ${num}"
+    elif [[ "${action}" == "reload_current" ]]; then
+        num=${num}
+        msg="Reloaded Waybar with current profile: $num"
+    else
+        msg="Nothing got selected"
+    fi
+
+    background_img="${config_dir}/waybar/themes/$num/bg/bg"
+    waybar_config="${config_dir}/waybar/themes/$num/config.jsonc"
+    waybar_styles="${config_dir}/waybar/themes/$num/style.css"
+
+    pkill -x waybar || true
+
+    if [[ $found_swww -eq 1 ]]; then
+        swww img "${background_img}" --transition-type fade
+    else
+        swaybg -o '*' -i "${background_img}" -m fill
+    fi
+
+    waybar -c "${waybar_config}" -s "${waybar_styles}" &> /dev/null &
+    notify-send -t 1000 "${msg}" || true
+}
+
+function main() {
+    local -g num=${1:-1}
+    local -g found_swww=0
+
+    pgrep -f "bash .*${0}" | grep -v "^$$" | xargs -r kill &> /dev/null || true
+
+    if command -v "swww-daemon" &> /dev/null; then
+        found_swww=1
+        pkill -x swww-daemon
+        swww-daemon &> /dev/null &
+    fi
+
+    trap 'toggle_theme toggle_next'     SIGUSR1
+    trap 'toggle_theme reload_current'  SIGUSR2
+    trap 'exit 0'                       SIGINT SIGTERM
+
+    num=$((num+2))
+
+    toggle_theme toggle_next
+
+    while read -r line; do :; done
+}
+
+main "${@}"
+

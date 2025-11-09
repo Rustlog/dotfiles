@@ -1,13 +1,13 @@
 ### Inner gaps ###
-gaps inner 4
+gaps inner 3
 
 ### Default Font ###
-font pango: SourceCodePro Large 4
+font pango: SourceCodePro 3
 
-### Waybar ###
-    bar {
-        # swaybar_command waybar
-    }
+### Bar ###
+bar {
+    # swaybar_command waybar
+}
 
 ### Output devices (Display) ###
     set $output         *
@@ -16,7 +16,6 @@ font pango: SourceCodePro Large 4
 
     set $output $output
 
-    # workspace $output output $output
     output $output  background #343434 solid_color
     output $output  mode 1920x1080@144Hz
     output $output  scale 1
@@ -27,7 +26,8 @@ font pango: SourceCodePro Large 4
     output $output  subpixel rgb
     output $output  adaptive_sync on
     output $output  allow_tearing yes
-    output $output  color_profile icc /usr/share/color/icc/colord/sRGB.icc
+    # output $output  color_profile icc /usr/share/color/icc/colord/sRGB.icc
+    output $output  color_profile icc /usr/share/color/icc/colord/Rec709.icc
 
 ### Enable Xwayland ##
     xwayland enabled
@@ -37,6 +37,7 @@ font pango: SourceCodePro Large 4
     #* Hide cursor in 1 secs
     seat * {
         hide_cursor 1000
+        xcursor_theme breeze_cursors 24
         hide_cursor when-typing enable
         pointer_constraint enable
     }
@@ -50,27 +51,29 @@ font pango: SourceCodePro Large 4
 
     #* All Pointer devices
     input type:pointer {
+        pointer_accel 1
+        scroll_factor 2
         natural_scroll disabled
         dwt enabled
         accel_profile adaptive
-        scroll_factor 2
-        pointer_accel 1
     }
 
     #* All Trackpads
     input type:touchpad {
-        accel_profile adaptive   # trackpad acceleration
+        pointer_accel 1
+        scroll_factor 2
         click_method clickfinger # Clickfinger
+        scroll_method two_finger # Scroll method
+        drag enabled
+        accel_profile adaptive   # trackpad acceleration
         middle_emulation enabled # Enable middle emulation
         drag_lock disabled       # Disable drag lock
         dwt enabled              # disable while typing
         natural_scroll enabled   # Inverted scroll
         tap enabled              # enable taps (should not be disabled)
-        tap_button_map lrm       # lmr {(1 finger tap left click) (2 finger tap right click) (3 finger tap middle click)}
-        scroll_method two_finger
-        scroll_factor 2
-        pointer_accel 1
-        drag enabled
+        tap_button_map lrm       # lrm  ( single finger tap: left click   )
+                                 #      ( Two finger tap:    right click  )
+                                 #      ( Three finger tap:  middle click )
     }
 
 ### Set $mod (Mod4 or Super) for logo key ###
@@ -83,41 +86,76 @@ font pango: SourceCodePro Large 4
     set $right l
 
 ### My Application launcher ###
-    set $menu_wofi wofi -W 40% -H 32% --gtk-dark --allow-images --config ${HOME}/.config/wofi/wofi.conf --allow-markup --hide-scroll --prompt="Search" --show drun
-    set $menu_rofi rofi -show-icons -font Hack -theme material -show drun
-    set $fuzzel fuzzel --background="#333333FA" --text-color="#BBBBBBFF" --width=60 --lines=10 --prompt="Search: "
+    set $menu_wofi wofi \
+        -W 40% -H 32% \
+        --gtk-dark \
+        --allow-images \
+        --allow-markup \
+        --hide-scroll \
+        --prompt="Search" \
+        --show drun
 
+    set $menu_rofi rofi \
+        -show-icons \
+        -font Hack \
+        -theme material \
+        -show drun
+
+    set $fuzzel fuzzel \
+        --background="#333333FA" \
+        --text-color="#BBBBBBFF" \
+        --width=60 --lines=10 \
+        --prompt="Search: "
 
 ### Auto Start ###
-    exec --no-startup-id /usr/lib/polkit-kde-authentication-agent-1
-    # Start's waybar
-    exec --no-startup-id ${HOME}/.config/sway/waybar/toggle_theme.sh
 
-    exec --no-startup-id autotiling
-    exec --no-startup-id "~/.scripts/something"
+    # pipewire
+    exec pipewire
+    # Notification deamon
+    exec mako
+    # Polkit agent for authorization
+    exec /usr/lib/polkit-kde-authentication-agent-1
+    # Start waybar
+    exec sleep 0.2 && bash ~/.config/sway/scripts/WaybarThemes 1
+    # Autotiling
+    exec autotiling
+    # Playerctl daemon
+    exec playerctld
+    # Easyeffects
+    exec easyeffects --gapplication-service
+    # NetworkManager indicator
+    exec nm-applet --indicator
 
     # XDG desktop fixes
-    exec --no-startup-id dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=sway XDG_SESSION_TYPE=wayland
-    exec --no-startup-id /usr/lib/xdg-desktop-portal-wlr &
-    exec --no-startup-id /usr/lib/xdg-desktop-portal -r
+    exec /usr/lib/xdg-desktop-portal-wlr &
+    exec /usr/lib/xdg-desktop-portal -r
 
-    # Set volume and mute mic
-    exec bash -c 'pactl set-sink-volume @DEFAULT_SINK@ 64%; pactl set-source-volume @DEFAULT_SOURCE@ 0%; pactl set-source-mute @DEFAULT_SOURCE@ true'
+    # GTK Theme
+    exec gsettings set org.gnome.desktop.interface gtk-theme Breeze
 
+    # Set default volume, mute mic and brightness
+    exec bash -c ' \
+        sleep 1; pactl set-sink-volume @DEFAULT_SINK@ 64%; \
+        pactl set-sink-mute @DEFAULT_SINK@ false; \
+        pactl set-source-volume @DEFAULT_SOURCE@ 0%; \
+        pactl set-source-mute @DEFAULT_SOURCE@ true; \
+        brightnessctl set 24% \
+    '
 
-    # swayidle for lockscreen
-    exec_always --no-startup-id swayidle -w \
+    exec swayidle -w \
             timeout 100 "${HOME}/.config/sway/lock_screen/lock.sh" \
             resume "swaymsg 'output * power on'" \
             before-sleep "${HOME}/.config/sway/lock_screen/lock.sh set_bg"
-    # Only most recent swayidle process
-    exec_always --no-startup-id bash -c 'ID="$(pgrep -f swayidle)"; [[ ${#ID} -le 10 ]] || echo "$ID" | grep -v "$(echo "$ID" | tail -n 2)" | xargs -x kill'
 
-    exec_always --no-startup-id bash -c 'sock="${XDG_RUNTIME_DIR}/foot${WAYLAND_DISPLAY/#/-}.sock"; [[ -S "${sock}" ]] || foot --server=${sock}'
-    exec_always --no-startup-id ${HOME}/.bin/sh/NowPlaying
+    # Start foot server
+    exec_always bash -c ' \
+        sock="${XDG_RUNTIME_DIR}/foot${WAYLAND_DISPLAY/#/-}.sock"; \
+        [[ -S "${sock}" ]] && exit 0; \
+        foot --server=${sock} & \
+    '
 
 ### Window rules ###
-    # Set opacity for all windows
+    # Set opacity
         set $vulkan 0.985
         set $opengl 0.885
 
@@ -127,21 +165,24 @@ font pango: SourceCodePro Large 4
     # Border of floating window
         for_window [class=".*"] default_floating_border pixel 1
     # Transparancy levels for applications
-        for_window [app_id="^(foot)$"] opacity 0.97
-        for_window [app_id="waterfox*|Alacritty*|mpv*|imv*"] opacity 1
-        for_window [class="Opera*|feh*"] opacity 1
-    # Any App Id with 'Floating', floating
-        for_window [app_id="^(Floating|Float|floating|float)$"] floating enable, move position center
-    # Enabele floating don't tile
-        for_window [app_id="^(com.rtosta.zapzap|org.pulseaudio.pavucontrol|pavucontrol|com.github.wwmm.easyeffects)$"] floating enable
-        for_window [app_id="^waterfox*"] floating enable
-        for_window [app_id="^(org.kde.dolphin|org.kde.plasma-systemmonitor|blueman-manager|org.kde.konsole)$"] floating enable
+        for_window [app_id="^foot$"] opacity 0.97
+        for_window [app_id="waterfox*|vivaldi*|Alacritty*|mpv*|imv*|org.pulseaudio.*"] opacity 1
+        for_window [app_id="^(journal|solid|solid_f|org.qutebrowser.qutebrowser)$"] opacity 1
+        for_window [class="Opera*|feh*|guvcview*|qutebrowser"] opacity 1
+    # Float Any App which has Id = 'Floating|Float|floating'
+        for_window [app_id="^(Floating|Float|solid_f|floating|float)$"] floating enable, move position center
+    # Enable floating (don't tile when launched)
+        for_window [app_id="^(com.rtosta.zapzap|org.pulseaudio.pavucontrol)$"] floating enable
+        for_window [app_id="^(nm-connection-editor)$"] floating enable
+        for_window [app_id="^(pavucontrol|com.github.wwmm.easyeffects)$|waterfox*|vivaldi*"] floating enable
+        for_window [app_id="^(org.kde.dolphin|org.kde.plasma-systemmonitor)$"] floating enable
+        for_window [app_id="^(blueman-manager|org.kde.konsole)$"] floating enable
         for_window [app_id="^(org.kde.okular|org.qutebrowser.qutebrowser|org.kde.kclock$)$"] floating enable
         for_window [class="^(Brave-browser|ZapZap|discord|qutebrowser)$"] floating enable
-        for_window [app_id="^blender*"] floating enable
+        for_window [app_id="^blender*|org.gnome.Nautilus"] floating enable
 
     # <outer-border-color> <frame-color> <title-text-color> <next-tiling-indicator-color>
-        client.focused #333333 #6600AA #DDDDDD #6600AA
+        client.focused   #333333 #6600AA #DDDDDD #6600AA
         client.unfocused #333333 #666666 #DDDDDD #666666
 
 ### Window Styling ###
@@ -159,10 +200,30 @@ font pango: SourceCodePro Large 4
 ### Keybindings for Containers/Workspaces/Gestures/Layout/Behaviour/Volume/Brightnes/Focus ###
 
     #* Reload the configuration file
-        bindsym $mod+Shift+C exec swaymsg reload
+        bindsym $mod+Shift+C exec swaymsg reload && exec bash ~/.config/sway/scripts/WaybarThemes 1
 
     #* Exit sway (Kicks you out of your Wayland session) *#
         bindsym $mod+Shift+E exec swaymsg exit
+
+    #* Rotate Display clockwise *
+        bindsym Alt+Tab exec bash -c ' \
+                current="$(swaymsg --raw --type get_outputs | jq -r \".[].transform\")"; \
+                [[ "${current}" == "normal" ]] && current=0; \
+                [[ "${current}" == "270" ]] && current=0 || current=$(( current + 90 )); \
+                swaymsg output "*" transform "${current}" \
+        '
+    #* Rotate Display counter-clockwise *
+        bindsym Alt+Shift+Tab exec bash -c ' \
+                current="$(swaymsg --raw --type get_outputs | jq -r \".[].transform\")"; \
+                [[ "${current}" == "normal" ]] && current=0; \
+                [[ "${current}" == "0" ]] && current=270 || current=$(( current - 90 )); \
+                swaymsg output "*" transform "${current}" \
+        '
+    #* Reset Display to default view (horizontal) *
+        bindsym $mod+0 exec swaymsg output '*' transform 0
+
+    #* Toggle keyboard layout *#
+        bindsym $mod+Alt+space input type:keyboard xkb_switch_layout next
 
     #* Mouse for dragging *#
         floating_modifier $mod normal
@@ -179,9 +240,21 @@ font pango: SourceCodePro Large 4
 
     #* Cycle next workspace *#
         # Focus the next window (one-directional)
-        bindsym $mod+Tab       exec bash -c 'swaymsg focus right || swaymsg focus down || swaymsg focus up || swaymsg focus left || swaymsg workspace next'
+        bindsym $mod+Tab exec bash -c ' \
+            swaymsg focus right || \
+            swaymsg focus down  || \
+            swaymsg focus up    || \
+            swaymsg focus left  || \
+            swaymsg workspace next \
+        '
         # Focus the previous window (one-directional)
-        bindsym $mod+Shift+Tab exec bash -c 'swaymsg focus left || swaymsg focus up || swaymsg focus down || swaymsg focus right || swaymsg workspace prev'
+        bindsym $mod+Shift+Tab exec bash -c ' \
+            swaymsg focus left  || \
+            swaymsg focus up    || \
+            swaymsg focus down  || \
+            swaymsg focus right || \
+            swaymsg workspace prev \
+        '
 
 
     #* Move focused container to workspace *#
@@ -196,60 +269,75 @@ font pango: SourceCodePro Large 4
 
     #* Special keys to adjust volume via PulseAudio *#
         bindsym {
-            XF86AudioMute           exec pactl set-sink-mute @DEFAULT_SINK@ toggle
-            XF86AudioMicMute        exec pactl set-source-mute @DEFAULT_SOURCE@ toggle
-            XF86AudioLowerVolume    exec pactl set-sink-volume @DEFAULT_SINK@ -5%
-            XF86AudioRaiseVolume    exec pactl set-sink-volume @DEFAULT_SINK@ +5%
+            XF86AudioMute        exec pactl set-sink-mute @DEFAULT_SINK@ toggle
+            XF86AudioMicMute     exec pactl set-source-mute @DEFAULT_SOURCE@ toggle
+            XF86AudioLowerVolume exec pactl set-sink-volume @DEFAULT_SINK@ -5%
+            XF86AudioRaiseVolume exec pactl set-sink-volume @DEFAULT_SINK@ +5%
+            XF86AudioPrev        exec playerctl previous
+            XF86AudioPause       exec playerctl pause-pause
+            XF86AudioNext        exec playerctl next
         }
 
     #* Special keys to adjust brightness via brightnessctl *#
         bindsym {
-            XF86MonBrightnessDown   exec brightnessctl set 5%-
-            XF86MonBrightnessUp     exec brightnessctl set 5%+
+            XF86MonBrightnessDown exec brightnessctl set 5%-
+            XF86MonBrightnessUp   exec brightnessctl set 5%+
         }
 
     # Audio-Video controls (playerctl)
         # Play-pause
-            bindsym F9                  exec playerctl play-pause
-            bindsym $mod+Up             exec playerctl play-pause
+            bindsym $mod+Up   exec playerctl play-pause
 
         # Mute sink (output)
-            bindsym $mod+Down           exec pactl set-sink-mute @DEFAULT_SINK@ toggle
+            bindsym $mod+Down exec pactl set-sink-mute @DEFAULT_SINK@ toggle
 
         # Seek backward
-            bindsym $mod+Ctrl+Left      exec playerctl position $( awk '{ print $1 - (5)  }' <<< $(playerctl position) )
-            bindsym $mod+Left           exec playerctl position $( awk '{ print $1 - (10) }' <<< $(playerctl position) )
-            bindsym $mod+Shift+Left     exec playerctl position $( awk '{ print $1 - (40) }' <<< $(playerctl position) )
+            bindsym $mod+Ctrl+Left  exec playerctl position $( awk '{ print $1 - (5)  }' <<< $(playerctl position) )
+            bindsym $mod+Left       exec playerctl position $( awk '{ print $1 - (10) }' <<< $(playerctl position) )
+            bindsym $mod+Shift+Left exec playerctl position $( awk '{ print $1 - (40) }' <<< $(playerctl position) )
 
         # Seek forward
-            bindsym $mod+Ctrl+Right     exec playerctl position $( awk '{ print $1 + (5)  }' <<< $(playerctl position) )
-            bindsym $mod+Right          exec playerctl position $( awk '{ print $1 + (10) }' <<< $(playerctl position) )
-            bindsym $mod+Shift+Right    exec playerctl position $( awk '{ print $1 + (40) }' <<< $(playerctl position) )
+            bindsym $mod+Ctrl+Right  exec playerctl position $( awk '{ print $1 + (5)  }' <<< $(playerctl position) )
+            bindsym $mod+Right       exec playerctl position $( awk '{ print $1 + (10) }' <<< $(playerctl position) )
+            bindsym $mod+Shift+Right exec playerctl position $( awk '{ print $1 + (40) }' <<< $(playerctl position) )
 
         # Volume controls
             # Volume up
-            bindsym $mod+Ctrl+Up        exec playerctl volume $( awk '{ print $1 + 1/20 }' <<< $(playerctl volume) )
+            bindsym $mod+Ctrl+Up   exec playerctl volume $( awk '{ print $1 + 1/20 }' <<< $(playerctl volume) )
             # Volume down
-            bindsym $mod+Ctrl+Down      exec playerctl volume $( awk '{ print $1 - 1/20 }' <<< $(playerctl volume) )
+            bindsym $mod+Ctrl+Down exec playerctl volume $( awk '{ print $1 - 1/20 }' <<< $(playerctl volume) )
 
         # Play previous
-            bindsym F8                  exec playerctl previous
-            bindsym $mod+Shift+Up       exec playerctl previous
+            bindsym $mod+Shift+Up exec playerctl previous
 
         # Play next
-            bindsym F10                 exec playerctl next
-            bindsym $mod+Shift+Down     exec playerctl next
+            bindsym $mod+Shift+Down exec playerctl next
 
     #* Gestures in sway *#
-    bindgesture swipe:3:right exec bash -c "swaymsg workspace $(( $(swaymsg --raw --type get_workspaces | jq -r '.[] | select(.focused).name') - 1 ))"
-    bindgesture swipe:3:left exec bash -c "swaymsg workspace $(( $(swaymsg --raw --type get_workspaces | jq -r '.[] | select(.focused).name') + 1 ))"
+
+    # bindgesture swipe:3:right exec bash -c " \
+    #     swaymsg workspace \
+    #     $(( $(swaymsg --raw --type get_workspaces | jq -r '.[] | select(.focused).name') - 1 )) \
+    # "
+    # bindgesture swipe:3:left exec bash -c " \
+    #     swaymsg workspace \
+    #     $(( $(swaymsg --raw --type get_workspaces | jq -r '.[] | select(.focused).name') + 1 )) \
+    # "
+
     bindgesture swipe:3:up floating enable
     bindgesture swipe:3:down floating disable
 
     bindgesture swipe:4:up move scratchpad
     bindgesture swipe:4:down scratchpad show
-    bindgesture pinch:3:inward exec bash -c 'swaymsg resize shrink height 20 ; swaymsg resize shrink width 20'
-    bindgesture pinch:3:outward exec bash -c 'swaymsg resize grow height 20 ; swaymsg resize grow width 20'
+
+    bindgesture pinch:3:inward exec bash -c ' \
+        swaymsg resize shrink height 20; \
+        swaymsg resize shrink width 20 \
+    '
+    bindgesture pinch:3:outward exec bash -c ' \
+        swaymsg resize grow height 20; \
+        swaymsg resize grow width 20 \
+    '
 
     #* Move your focus around, mode: VIM (hjkl) *#
         bindsym {
@@ -327,24 +415,27 @@ font pango: SourceCodePro Large 4
 
     #* Executable Binaries *#
         # Keyboard centric browser
-            bindsym $mod+F1 exec env QT_QPA_PLATFORM=xcb QT_WEBENGINE_DISABLE_GPU=1 qutebrowser
+            bindsym $mod+F1 exec \
+                env QT_QPA_PLATFORM=wayland qutebrowser
         # Browser 1
-            bindsym $mod+F2 exec ${HOME}/.browser 2
+            bindsym $mod+F2 exec find ~/.bin/ -name Browser -exec {} 2 ";"
         # Browser 2
-            bindsym $mod+F3 exec ${HOME}/.browser 3
+            bindsym $mod+F3 exec find ~/.bin/ -name Browser -exec {} 3  ";"
         # Browser 4
-            bindsym $mod+F4 exec ${HOME}/.browser 4
+            bindsym $mod+F4 exec find ~/.bin/ -name Browser -exec {} 4  ";"
         # Browser 5
-            bindsym $mod+F5 exec ${HOME}/.browser 5
+            bindsym $mod+F5 exec find ~/.bin/ -name Browser -exec {} 5  ";"
 
         # Bring my Text-fu terminal
             bindsym $mod+Return exec footclient
+            bindsym Alt+Return exec footclient --app-id=solid
             bindsym $mod+Shift+Return exec alacritty
 
-        # Good File Managers
-            bindsym Alt+E exec env XDG_CURRENT_DESKTOP=kde QT_QPA_PLATFORMTHEME=qt6ct dolphin
-            bindsym $mod+E exec env XDG_CURRENT_DESKTOP=kde nautilus
-        # Lauch wofi
+        # File Managers
+            bindsym Alt+E exec \
+                env XDG_CURRENT_DESKTOP=kde QT_QPA_PLATFORMTHEME=qt6ct dolphin
+            bindsym $mod+E exec nautilus
+        # Lauch application launcher
             bindsym Alt+Space exec $fuzzel
             bindsym Alt+Shift+Space exec $menu_rofi
         # Lauch fuzzel
@@ -357,96 +448,164 @@ font pango: SourceCodePro Large 4
     #* Direct Shell Commands *#
         #$ Screen Recording $#
             # Start recording fullscreen! (Mod+Alt+V)
-                bindsym $mod+Alt+V exec bash -c \
-                    'DIR="${HOME}/WF_Recorder"; [[ ! -d "${DIR}" ]] && mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null || declare -a flags=("--pixel-format=yuv420p" "--framerate=60" --audio="$(pactl get-default-sink).monitor" "--file="${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv""); wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast || wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast'
+                bindsym $mod+Alt+V exec bash -c ' \
+                    DIR="${HOME}/media/WF_Recorder"; \
+                    if [[ ! -d "${DIR}" ]]; then \
+                        mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null; \
+                    else \
+                        declare -a flags; \
+                        flags=( \
+                            "--pixel-format=yuv420p" \
+                            "--framerate=60" \
+                            "--audio=$(pactl get-default-sink).monitor" \
+                            "--file=${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv" \
+                        ); \
+                    fi; \
+                    notify-send -t 1000 "Screen recording started (fullscreen)"; \
+                    if ! wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast; then \
+                        wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast; \
+                    fi \
+                ' &>> '/tmp/sway_fullscreen_recording.log'
 
             # Start recording on selected ratio of the screen (Mod+Shift+V)
-                bindsym $mod+Shift+V exec bash -c \
-                    'DIR="${HOME}/WF_Recorder"; [[ ! -d "${DIR}" ]] && mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null || declare -a flags=("--pixel-format=yuv420p" "--framerate=60" --audio="$(pactl get-default-sink).monitor" "-g" "$(slurp)" "--file="${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv""); wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast || wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast'
+                bindsym $mod+Shift+V exec bash -c ' \
+                    DIR="${HOME}/media/WF_Recorder"; \
+                    if [[ ! -d "${DIR}" ]]; then \
+                        mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null; \
+                    else \
+                        declare -a flags; \
+                        flags=( \
+                            "--pixel-format=yuv420p" \
+                            "--framerate=60" \
+                            "--audio=$(pactl get-default-sink).monitor" \
+                            "--geometry=$(slurp -b=aaccbb11)" \
+                            "--file=${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv" \
+                        ); \
+                    fi; \
+                    notify-send -t 1000 "Screen recording started (${flags[3]##*=})"; \
+                    if ! wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast; then \
+                        wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast; \
+                    fi \
+                ' &>> '/tmp/sway_selected_screen_recording.log'
 
             # Stop recording send INT sig to the recorder (Mod+Alt+C)
-                bindsym $mod+Alt+C exec bash -c \
-                    '$(kill -INT $(pidof wf-recorder))'
+                bindsym $mod+Alt+C exec bash -c ' \
+                    notify-send -t 3000 "Recording Stopped"; \
+                    kill -INT $(pidof wf-recorder) \
+                '
 
         #$ Screenshot $#
             # Take screenshot of fullscreen! (Mod+PrtSc)
-               bindsym $mod+Print exec bash -c \
-                   '$(DIR="${HOME}/Grim_Screenshots"; [[ ! -d "${DIR}" ]] && mkdir -p "${DIR}"; grim "${DIR}/$(date +%d-%b-%Y_%H:%M:%S).png")'
+                bindsym $mod+Print exec bash -c ' \
+                   DIR="${HOME}/media/Grim_Screenshots"; \
+                   [[ -d "${DIR}" ]] || mkdir -p "${DIR}"; \
+                   grim "${DIR}/$(date +%d-%b-%Y_%T).png" \
+                '
             # Screenshot of selected area (Mod+Shift+S)
-                bindsym $mod+Shift+S exec bash -c \
-                    '$(DIR="${HOME}/Grim_Screenshots"; [[ ! -d "${DIR}" ]] && mkdir -p "${DIR}"; grim -g "$(slurp)" "${DIR}/$(date +%d-%b-%Y_%H:%M:%S).png")'
+                bindsym $mod+Shift+S exec bash -c ' \
+                    DIR="${HOME}/media/Grim_Screenshots"; \
+                    [[ -d "${DIR}" ]] || mkdir -p "${DIR}"; \
+                    grim -g "$(slurp -b=aaccbb11)" "${DIR}/$(date +%d-%b-%Y_%T).png" \
+                '
 
         # Edit this (sway config) with neovim or vim
-            bindsym $mod+I exec bash -c \
-                'CONF=${HOME}/.config/sway/config; \
-                    foot nvim ${CONF}'
+            bindsym $mod+I exec foot --app-id=solid bash -c ' \
+                conf=${HOME}/.config/sway/config; \
+                nvim ${conf} \
+            '
 
         # Shutdown (Mod+Alt+Shift+P)
-            bindsym $mod+Alt+Shift+P exec bash -c \
-                '$(notify-send "Shutting down... because I need a nap"; sleep 2; systemctl poweroff --now)'
+            bindsym $mod+Alt+Shift+P exec bash -c ' \
+                notify-send "Shutting down...!"; \
+                sleep 2 && systemctl poweroff --now || loginctl poweroff \
+            '
         # Reboot/Restart ($mod+Alt+Shift+R)
-            bindsym $mod+Alt+Shift+R exec bash -c \
-                '$(notify-send "REBOOTING... Sometimes you need to restart!"; sleep 2; systemctl reboot --now)'
+            bindsym $mod+Alt+Shift+R exec bash -c ' \
+                notify-send "REBOOTING...!"; \
+                sleep 2 && systemctl reboot --now  || loginctl reboot \
+            '
         # Sleep (Mod+Alt+Shift+delete)
-            bindsym $mod+Alt+Shift+delete exec bash -c \
-                '$(notify-send "I need some Rest"; sleep 2; systemctl suspend --now)'
+            bindsym $mod+Alt+Shift+delete exec bash -c ' \
+                notify-send "I need some Rest"; \
+                sleep 2 && systemctl suspend --now || loginctl suspend \
+            '
 
         # Shutdown  ($mod+Alt+P)
-            bindsym $mod+Alt+P exec bash -c \
-                '$(swaymsg exit; systemctl poweroff --now)'
+            bindsym $mod+Alt+P      exec systemctl poweroff --now || loginctl poweroff
+
         # Reboot/Restart (Mod+Alt+R)
-            bindsym $mod+Alt+R exec bash -c \
-                '$(swaymsg exit; systemctl reboot --now)'
+            bindsym $mod+Alt+R      exec systemctl reboot --now || loginctl reboot
         # Sleep (Alt+Ctrl+delete)
-            bindsym $mod+Alt+delete exec bash -c \
-                '$(systemctl suspend --now)'
+            bindsym $mod+Alt+delete exec systemctl suspend --now || loginctl suspend
 
         # Hybrid sleep, like sleep but cooler (Mod+Alt+S)
-            bindsym $mod+Alt+S exec bash -c \
-                '$(systemctl hybrid-sleep --now)'
+            bindsym $mod+Alt+S      exec systemctl hybrid-sleep --now
 
         # What's my selected screen resolution? (Mod+Shift+G)
-            bindsym $mod+Shift+G exec bash -c \
-                '$(Res="$(slurp)" && notify-send -t 8000 "${Res}")'
+            bindsym $mod+Shift+G  exec bash -c ' \
+                res="$(slurp -b aaccbb11)"; \
+                notify-send -t 8000 "${res}"; \
+                wl-copy "${res}"\
+            '
 
-        # List of Emojies in rofi-emoji (backslash+E)
-            bindsym $mod+grave+V exec bash -c \
-                '$(rofi -modi emoji -show emoji)'
+        # List of Emojies in rofi-emoji (Mod+backslash+E)
+            bindsym $mod+grave+V exec rofi -modi emoji -show emoji
+
+        # Select and set wallaper
+        bindsym $mod+W+Space exec foot --app-id=floating -w 1200x600 bash -c ' \
+            dir="${HOME}/.local/share/wallpapers"; \
+            cd "${dir}"; \
+            selected="$(fzf --preview-window right:80% --preview="chafa --size=60x30 --animate=off {}")"; \
+            swww img "${dir}/${selected}" --transition-type fade --transition-duration 1; \
+        '
 
         # Temporary thought dumping
-            bindsym $mod+Shift+T exec foot bash -c 'temp_edit_file="$(mktemp -t temp_edit.XXXX)"; trap "rm -f ${temp_edit_file}" SIGKILL SIGINT; command -v nvim &> /dev/null && EDITOR="nvim" || EDITOR="vim"; ${EDITOR} "${temp_edit_file}"; wl-copy < "${temp_edit_file}"; rm -f "${temp_edit_file}"'
+            bindsym $mod+grave+T exec foot bash -c ' \
+                temp_edit_file="$(mktemp -t temp_edit.XXXX)"; \
+                trap "rm -f \${temp_edit_file}" EXIT SIGKILL SIGINT; \
+                command -v nvim &> /dev/null && EDITOR="nvim"; \
+                ${EDITOR:-vim} "${temp_edit_file}"; wl-copy < "${temp_edit_file}"; \
+                rm -f "${temp_edit_file}" \
+            '
 
     #* System monitors *#
         # htop
-        bindsym Ctrl+Shift+Escape exec bash -c \
-            '$( foot -e htop ||  foot -e btop )'
-        # btop
-        bindsym Ctrl+Escape exec bash -c \
-            '$( foot -e btop || foot -e htop )'
-        # Plasma system monitor
-        bindsym $mod+Escape exec bash -c \
-            '$( env XDG_CURRENT_DESKTOP=KDE GTK_THEME=Adwaita:dark plasma-systemmonitor || ( foot -e htop || sudo pacman -Sy htop --noconfirm))'
+        bindsym Ctrl+Shift+Escape exec foot bash -c ' \
+            htop || btop \
+        '
 
-    #* Toggle keyboard layout *#
-        bindsym $mod+Alt+space input type:keyboard xkb_switch_layout next
+        # btop
+        bindsym Ctrl+Escape exec foot bash -c ' \
+            btop || htop \
+        '
+
+        # Plasma system monitor
+        bindsym $mod+Escape exec bash -c ' \
+            if ! env XDG_CURRENT_DESKTOP=KDE \
+                GTK_THEME=Adwaita:dark \
+                plasma-systemmonitor; then \
+                foot htop || sudo pacman -Sy htop --noconfirm \
+            fi \
+        '
 
     #* Scripts *#
-        # An application launcher
-            bindsym Shift+F10 exec bash -c \
-                'FILE="${HOME}/.config/sway/waybar/toggle_theme.sh"; pgrep -f "${FILE}" || "${FILE}"; pkill -x waybar; pkill -SIGUSR1 -f ${FILE}; ${HOME}/.bin/sh/NowPlaying'
-            bindsym $mod+F10 exec pkill -f "toggle_theme.sh"; pkill -f '.*bin/waybar'
+        # Waybar
+            # Reload current theme
+            bindsym Ctrl+F10 exec pkill -SIGUSR2 -f "WaybarThemes 1"
+            # toggle Next theme
+            bindsym Shift+F10 exec pkill -SIGUSR1 -f "WaybarThemes 1"
+            # Kill waybar
+            bindsym Ctrl+Shift+F10 exec pkill -SIGTERM -f "WaybarThemes 1|waybar -c"
 
         # Create cava windows to look cool
-            bindsym $mod+P exec "${HOME}/.bin/CavaInstances"
-            bindsym $mod+O exec "${HOME}/.bin/CavaInstances CLEAN"
-
-        # Execute whatever the hell that script does
-            bindsym $mod+grave+G exec bash -c \
-               '${HOME}/.exec_me'
+            bindsym $mod+P exec $(find ~/.bin/ -type f -name CavaInstances)
+            bindsym $mod+O exec $(find ~/.bin/ -type f -name CavaInstances) clean
 
         # Journal time
-            bindsym $mod+grave+J exec bash -c \
-                '$(foot -e env EDITOR=nvim ${HOME}/.bin/JournalToday edit)'
+            bindsym $mod+grave+J exec foot --app-id=journal bash -c ' \
+                command -v nvim &> /dev/null && export EDITOR=${EDITOR:-nvim}; \
+                ${HOME}/.bin/main/JournalToday edit \
+            '
 
 
 ### Additional configuration

@@ -1,32 +1,27 @@
 #!/usr/bin/env bash
 
-PLAYERS="$(playerctl --list-all)"
+builtin set -euo pipefail
 
 function set_background() {
-    swaylock --daemonize --image "${HOME}/.config/sway/lock_screen/lock_bg"
+    hyprlock --config "${0%/*}/hyprlock.config" &
+}
+
+function turn_off_display() {
+    sleep 0.04
+    swaymsg output '*' power off
 }
 
 function main() {
-    local arg1="$1"
+    [[ "${1:-""}" == "set_bg" ]] && { set_background; return 0; }
 
-    if [[ "${arg1}" == "set_bg" ]]; then
-        set_background
-        return 0
+    if command -v playerctl &> /dev/null && command -v playerctld &> /dev/null; then
+        (playerctl --player=playerctld status 2>/dev/null | grep -q Playing) && return 0
     fi
 
-    [[ -z "${PLAYERS}" ]] && PLAYERS="NotPlaying"
-
-    IFS=$'\n'; for player in ${PLAYERS}; do
-        status_=$(playerctl --player="${player}" status 2>/dev/null)
-        if [[ "${status_}" == "Playing" ]]; then
-            return 0
-        fi
-    done
-
     set_background
-    sleep 0.04 && swaymsg 'output * power off'
-    # systemctl suspend
+
+    turn_off_display
 }
 
-main "$@"
+main "${@}"
 

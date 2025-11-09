@@ -2,20 +2,6 @@
 
 
 
-/* Tokyo Night */
-@define-color background #1a1b26;
-@define-color background-light #24283b;
-@define-color foreground #c0caf5;
-@define-color black #15161e;
-@define-color red #f7768e;
-@define-color green #9ece6a;
-@define-color yellow #e0af68;
-@define-color blue #7aa2f7;
-@define-color magenta #bb9af7;
-@define-color cyan #7dcfff;
-@define-color white #a9b1d6;
-@define-color orange #ff9e64;
-
 
 /* Everforest Dark Colors */
 @define-color background #2b3339;
@@ -62,6 +48,21 @@
 @define-color orange #d65d0e;
 
 
+/* Tokyo Night */
+@define-color background #1a1b26;
+@define-color background-light #24283b;
+@define-color foreground #c0caf5;
+@define-color black #15161e;
+@define-color red #f7768e;
+@define-color green #9ece6a;
+@define-color lang #9afe6a;
+@define-color yellow #e0af68;
+@define-color blue #7aa2f7;
+@define-color magenta #bb9af7;
+@define-color cyan #7dcfff;
+@define-color white #a9b1d6;
+@define-color orange #ff9e64;
+
 
 /* Module-specific colors */
 @define-color workspaces-color @foreground;
@@ -69,6 +70,9 @@
 @define-color workspaces-focused-fg @cyan;
 @define-color workspaces-urgent-bg @red;
 @define-color workspaces-urgent-fg @black;
+@define-color cava_purple #AA00FF;
+@define-color now_playing_active #AAAAAA;
+@define-color text_dim #888888;
 
 /* Text and border colors for modules */
 @define-color mode-color @orange;
@@ -81,6 +85,7 @@
 @define-color temperature-color @yellow;
 @define-color temperature-critical-color @red;
 @define-color battery-color @cyan;
+@define-color language-color @lang;
 @define-color battery-charging-color @green;
 @define-color battery-warning-color @yellow;
 @define-color battery-critical-color @red;
@@ -112,7 +117,7 @@ window#waybar {
 
 
 /* Common module styling with border-bottom */
-#mode, #mpd, #custom-weather, #custom-playerctl, #clock, #cpu,
+#language, #mode, #mpd, #custom-weather, #custom-playerctl, #clock, #cpu,
 #memory, #temperature, #battery, #network, #pulseaudio,
 #backlight, #disk, #custom-uptime, #custom-updates, #custom-quote,
 #idle_inhibitor, #tray {
@@ -120,6 +125,7 @@ window#waybar {
     margin: 0 2px;
     border-bottom: 2px solid transparent;
     background-color: transparent;
+    margin: 0 3px;
 }
 
 /* Workspaces styling */
@@ -146,41 +152,35 @@ window#waybar {
     color: @workspaces-urgent-fg;
 }
 
+/* Custom modules */
+
+#custom-seperator { color: @text_dim; }
+
+#custom-now_playing.inactive { color: transparent; }
+
+#custom-now_playing.active {
+    color: @now_playing_active;
+    min-width: 10px;
+}
+
+#custom-cava.active {
+    color: @cava_purple;
+    animation-name: cava_Blink;
+    animation-duration: 4s;
+    animation-timing-function: ease;
+    animation-iteration-count: infinite;
+    animation-direction: reverse;
+}
+
+#custom-cava.inactive {
+    opacity: 1;
+    color: transparent;
+}
+
 /* Module-specific styling */
 #mode {
     color: @mode-color;
     border-bottom-color: @mode-color;
-}
-
-#mpd {
-    color: @mpd-color;
-    border-bottom-color: @mpd-color;
-}
-
-#mpd.disconnected,
-#mpd.stopped {
-    color: @foreground;
-    border-bottom-color: transparent;
-}
-
-#custom-weather {
-    color: @weather-color;
-    border-bottom-color: @weather-color;
-}
-
-#custom-playerctl {
-    color: @playerctl-color;
-    border-bottom-color: @playerctl-color;
-}
-
-#custom-playerctl.Playing {
-    color: @cyan;
-    border-bottom-color: @cyan;
-}
-
-#custom-playerctl.Paused {
-    color: @orange;
-    border-bottom-color: @orange;
 }
 
 #clock {
@@ -211,6 +211,11 @@ window#waybar {
 #battery {
     color: @battery-color;
     border-bottom-color: @battery-color;
+}
+
+#language {
+    color: @language-color;
+    border-bottom-color: @language-color;
 }
 
 #battery.charging, #battery.plugged {
@@ -256,21 +261,6 @@ window#waybar {
 #disk {
     color: @disk-color;
     border-bottom-color: @disk-color;
-}
-
-#custom-uptime {
-    color: @uptime-color;
-    border-bottom-color: @uptime-color;
-}
-
-#custom-updates {
-    color: @updates-color;
-    border-bottom-color: @updates-color;
-}
-
-#custom-quote {
-    color: @quote-color;
-    border-bottom-color: @quote-color;
 }
 
 #idle_inhibitor {
