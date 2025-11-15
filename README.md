@@ -2,16 +2,20 @@
 
 ## This is my personal configuration file repository for my Void Linux setup.
 
+## Screenshot
+![](docs/images/void-linux-fastfetch-output.webp)
+
 #### Core configuration (Main setup):
 - **Sway**: [~/.config/sway/config](sway/config)
 - **Waybar**: [~/.config/sway/waybar](sway/waybar/)
 - **Neovim**: [/etc/xdg/nvim/init.vim](neovim/init.vim)
 - **Vim**: [/etc/vimrc](vim/vimrc)
-- **Common Shell**: [ Shell config (bash and zsh) ](shell/shell_rc)
+- **Common shell config**: [ Shell config (bash and zsh) ](shell/shell_rc)
 - **Foot**: [~/.config/foot/foot.ini](foot/foot.ini)
 - **Wofi**: [~/.config/wofi](wofi/)
 - **ArchSetup**: [Setup scripts for Arch Linux](ArchSetup/)
 - **Scripts:** [Handy scripts (PlayMusic, MountSSH, Encrypt, and more)](scripts/)
+- **Yazi**: [~/.config/yazi](yazi/)
 
 #### Others (Not used often)
 - **i3**: [~/.config/i3/config](i3/config)
@@ -19,10 +23,8 @@
 - **Alacritty**: [~/.config/alacritty/alacritty.toml](alacritty/alacritty.toml)
 - **Qutebrowser**: [~/.config/qutebrowser](qutebrowser/)
 - **Kitty**: [~/.config/kitty/kitty.conf](kitty/kitty.conf)
-- **Yazi**: [~/.config/yazi](yazi/)
 
 ### Tree view
-[Rustlog](https://github.com/Rustlog/dotfiles)
 ```
 ~-- sway/                       # Sway WM config and scripts
 |   |-- lock_screen/

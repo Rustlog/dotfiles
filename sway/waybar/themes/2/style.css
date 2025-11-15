@@ -102,7 +102,7 @@
     /* Base styling for all modules */
     border: none;
     border-radius: 3px;
-    font-family: "Iosevka Nerd Font";
+    font-family: "SourceCodePro Bold", "SourceSansPro Semibold", "DejaVu Sans";
     font-size: 14px;
     min-height: 0;
 }
@@ -127,7 +127,7 @@ window#waybar {
 
 /* Workspaces styling */
 #workspaces button {
-    padding: 0 10px;
+    padding: 0 8px;
     background-color: transparent;
     color: @workspaces-color;
     margin: 0;
@@ -172,6 +172,11 @@ window#waybar {
 #custom-cava.inactive {
     opacity: 1;
     color: transparent;
+}
+
+@keyframes cava_Blink {
+    0%   { color: @cava_purple; opacity: 1; }
+    100% { color: @cava_purple; opacity: 1; }
 }
 
 /* Module-specific styling */

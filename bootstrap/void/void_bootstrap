@@ -620,6 +620,7 @@ function Install_utils() {
         fuse-sshfs lsof rsyslog plymouth man-db mlocate
         xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
         chafa numactl
+        libwebp-tools # cwewp
         ImageMagic NetworkManager network-manager-applet # Network Manager
         wireless_tools # for iwlist
         tldr # simple summary of commands

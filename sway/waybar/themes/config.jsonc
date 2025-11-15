@@ -22,7 +22,7 @@
         "temperature",
         "custom/seperator",
         "custom/cava",
-        "custom/now_playing"
+        "mpris"
     ],
     "modules-center": [
         "sway/workspaces",
@@ -70,6 +70,21 @@
         "on-click": "nwg-drawer -mb 200 -ml 400 -mr 450 -mt 200",
         "tooltip": false,
         "format": "  "
+    },
+
+    "mpris": {
+        "dynamic-order": ["title", "artist", "album"],
+        "dynamic-importance-order": ["title", "artist", "album"],
+        "format": "{player_icon} {dynamic}",
+        "tooltip-format": "{player} ({status})\n{dynamic}\n",
+        "format-paused": "############################",
+        "max-length": 40,
+        "player-icons": {
+            "default": "",
+            "mpv": "🎵",
+            "firefox": " ",
+            "spotify": " "
+        }
     },
 
     "custom/seperator": {

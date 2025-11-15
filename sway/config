@@ -1,5 +1,5 @@
 ### Inner gaps ###
-gaps inner 3
+gaps inner 4
 
 ### Default Font ###
 font pango: SourceCodePro 3
@@ -148,7 +148,7 @@ bar {
         pactl set-sink-mute @DEFAULT_SINK@ false; \
         pactl set-source-volume @DEFAULT_SOURCE@ 0%; \
         pactl set-source-mute @DEFAULT_SOURCE@ true; \
-        brightnessctl set 24% \
+        brightnessctl set 34% \
     '
 
     exec swayidle -w \
@@ -177,6 +177,7 @@ bar {
         for_window [app_id="waterfox*|vivaldi*|Alacritty*|mpv*|imv*|org.pulseaudio.*"] opacity 1
         for_window [app_id="^(journal|solid|solid_f|org.qutebrowser.qutebrowser)$"] opacity 1
         for_window [class="Opera*|feh*|guvcview*|qutebrowser"] opacity 1
+        for_window [app_id="^(com.github.wwmm.easyeffects)$"] opacity 1
     # Float Any App which has Id = 'Floating|Float|floating'
         for_window [app_id="^(Floating|Float|solid_f|floating|float)$"] floating enable, move position center
     # Enable floating (don't tile when launched)

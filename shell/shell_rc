@@ -69,7 +69,7 @@ function Export_vars() {
     export PATH="/usr/bin"
     export MEDIA="/run/media/$USER"
     export XDG_DATA_HOME="$HOME/.local/share"
-    export HOME="${HOME:-"$(echo ~)"}"
+    export HOME="${HOME:-"$(printf ~)"}"
     export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-"/run/user/$UID"}"
     export PAGER=less
     export LESS="-R -s"
@@ -155,7 +155,7 @@ function Alias_vars() {
     alias ncdu="ncdu --color dark"
     alias qemu="qemu-system-x86_64"
     alias sway="env XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=sway WLR_RENDERER=vulkan sway &> /tmp/sway.log"
-    alias VimBeGood="clear; docker run -it --rm brandoncc/vim-be-good:stable && echo && clear"
+    alias VimBeGood="clear; podman run -it --rm brandoncc/vim-be-good:stable && printf '\n' && clear"
     alias gtypistH="gtypist --personal-best --max-error=1.8 --no-welcome-screen --term-cursor --word-processor --always-sure"
     alias qutebrowser="QT_QPA_PLATFORM=xcb QT_WEBENGINE_DISABLE_GPU=1 qutebrowser"
     alias colorchoser="env QT_QPA_PLATFORMTHEME=qt6ct kcolorchooser 2> /dev/null & disown"
@@ -429,6 +429,7 @@ function RcloneMount() {
         [[ -n "${drive#*=}" ]] && {
             drive="${drive#*=}"
         }
+
     [[ -n $BASH_VERSION ]] && mapfile -t matches < <(rclone listremotes | grep --color=never -i "${drive}")
     [[ -n $ZSH_VERSION ]] && {
         matches=("$(rclone listremotes | grep --color=never -i ${drive})")
@@ -483,9 +484,9 @@ function RcloneMount() {
     if [[ $umount -eq 1 ]]; then
         [[ -z ${mountPoint} ]] && mountPoint=$(grep --color=never "${drive}" /proc/mounts | cut -d' ' -f2)
         if [[ -d "${mountPoint}" ]]; then
-            fusermount -uz "${mountPoint}" || echo "Cannot remove '${DIR}'"
+            fusermount -uz "${mountPoint}" || log error "Cannot remove '${DIR}'"
             rm -rf "${mountPoint}" && \
-                echo -e "Cleaned '$(grep --color=always "${drive}" /proc/mounts | cut -d' ' -f2)'"
+                log info "Cleaned '$(grep --color=always "${drive}" /proc/mounts | cut -d' ' -f2)'"
         fi
         return 0
     fi
@@ -706,7 +707,7 @@ function SetPath() {
 
     local tmp_path="/tmp/.home.path"
     if [[ ! -s "${tmp_path}" ]] ;then
-        echo "$PATH" &> "${tmp_path}"
+        printf '%s\n' "$PATH" &> "${tmp_path}"
     else
         export PATH="$(cat "${tmp_path}")"
     fi
@@ -909,8 +910,8 @@ sysstat() {
     local stat_path="/sys/block/$dev/stat"
     local st_dir="/sys/block/$dev/statistics"
 
-    [[ ! -e $rx_path ]] && { echo "No such iface: $iface"; return 1; }
-    [[ ! -e $stat_path ]] && { echo "No such block dev: $dev"; return 1; }
+    [[ ! -e $rx_path ]] && { log error "No such iface: $iface"; return 1; }
+    [[ ! -e $stat_path ]] && { log error "No such block dev: $dev"; return 1; }
 
     human() {
         local bytes=$1
@@ -1373,6 +1374,41 @@ function Pretty() {
     done
 }
 
+### Play directly from Tar files
+function TarPlay() {
+    local archive="${1}"
+    local -a selected=()
+    local -a tar_opts=()
+
+    [[ -f "${archive}" ]] || { log error "File not found: '${archive}'"; return 1; }
+
+    case "${archive}" in
+        *.tar.gz|*.tgz)  tar_opts=(-z) ;;
+        *.tar.bz2|*.tbz2|*.tbz) tar_opts=(-j) ;;
+        *.tar.xz|*.txz)  tar_opts=(-J) ;;
+        *.tar)           tar_opts=() ;;
+        *) log fatal "Unsupported format: ${archive}"; return 1 ;;
+    esac
+
+    if [[ -n $ZSH_VERSION ]]; then
+        selected="${(@f)$(tar "${tar_opts[@]}" -tf "${archive}" 2>/dev/null | \
+            fzf --multi --prompt="Stream from '${archive}' > " --height=20 --border)}" || return 1
+    elif [[ -n $BASH_VERSION ]]; then
+        mapfile -t selected <(tar "${tar_opts[@]}" -tf "${archive}" 2>/dev/null | \
+            fzf --multi --prompt="Stream from '${archive}' > " --height=20 --border) || return 1
+    fi
+
+    [[ ${#selected[@]} -ne 0 ]] || { log error "No file selected"; return 0; }
+
+    for file in "${selected[@]}"; do
+        while IFS=$'' read -r f; do
+            [[ -n "${f}" ]] || continue
+            log info "Streaming: ${f}"
+            tar "${tar_opts[@]}" -xOf "${archive}" "${f}" 2>/dev/null | \
+                mpv --quiet --term-playing-msg='Now playing: ${filename}' -
+        done <<< "${file}"
+    done
+}
 
 ### Lauch sway Window manager with vulkan
 function sway_vulkan() {
@@ -1481,7 +1517,7 @@ function start_docker() {
 ### Remove Unnecessary characters from given file
 function Pretty_rename() {
     for file in "$@"; do
-        mv -- "${file}" "$(echo "$file" | sed 's/\[[^]]*\]//g' | sed 's/[^A-Za-z0-9._-$@]/_/g' | sed 's/_\+/_/g')" 2> /dev/null
+        mv -- "${file}" "$(printf '%s\n' "${file}" | sed 's/\[[^]]*\]//g' | sed 's/[^A-Za-z0-9._-$@]/_/g' | sed 's/_\+/_/g')" 2> /dev/null
     done
 }
 
@@ -1504,7 +1540,7 @@ function SSH_Agent() {
     local ssh_agent="/tmp/.ssh_agent"
     if [[ ! -s "${ssh_agent}" ]]; then
         touch "${ssh_agent}"
-        echo "$(ssh-agent -s)" > "${ssh_agent}"
+        printf '%s\n' "$(ssh-agent -s)" > "${ssh_agent}"
     else
         source "${ssh_agent}" &> /dev/null
     fi

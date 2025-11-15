@@ -3,7 +3,7 @@
 /* ========================== */
 
 /* Predefined colors */
-@define-color bg_main            rgba(43, 48, 59, 0.98);
+@define-color bg_main            rgba(43, 48, 59, 0.8);
 @define-color text_main          #FFFFFF;                 /* Default text in waybar */
 @define-color text_dim           #888888;                 /* Inactive/dim text (separators) */
 @define-color accent_purple      #8810DD;                 /* Hover accents */
@@ -12,7 +12,7 @@
 @define-color cava_purple        #AA00FF;                 /* Cava animation */
 @define-color launcher_fg        #FFFFAA;                 /* Launcher text */
 @define-color launcher_bg        rgba(80, 80, 180, 0.2);  /* Launcher bg */
-@define-color battery_good       #FFBBBB;                 /* Battery > good (your override) */
+@define-color battery_good       #FFBBBB;                 /* Battery > good*/
 @define-color battery_warning    #FF2222;                 /* Battery warning */
 @define-color battery_critical   #F53C3C;                 /* Battery critical bg */
 @define-color battery_blink_from rgba(224, 48, 42, 1);
@@ -36,7 +36,7 @@
 @define-color temperature_critical #FF0000;
 @define-color tray_attention     #EB4D4B;
 @define-color language_fg        #ffffd0;
-@define-color scratchpad_fg      coral;
+@define-color scratchpad_fg      #FFAAFF;
 @define-color scratchpad_bg      rgba(0, 0, 0, 0.6);
 @define-color privacy_screenshare #CF5700;
 @define-color privacy_audio_in   #1CA000;
@@ -69,7 +69,6 @@ window#waybar {
     color: @text_main;
     transition-property: background-color;
     transition-duration: 0.5s;
-    margin: 8px 0px; /* Vertical margin only (adjust for sway gaps) */
 }
 
 window#waybar.hidden {
@@ -91,7 +90,6 @@ window#waybar.chromium { background-color: #000000; border: none; }
 
 #workspaces {
     box-shadow: inset 0px 0px 2px 2px rgba(0, 0, 0, 0);
-    margin: 0px 4px;
 }
 
 .modules-left > widget:first-child > #workspaces { margin-left: 0; }
@@ -99,15 +97,14 @@ window#waybar.chromium { background-color: #000000; border: none; }
 
 #workspaces button {
     transition: none;
-    padding: 0px 0px;
+    padding: 0px 3px;
     color: @text_dim;
-    margin: 4px;
     border-radius: 3px;
     box-shadow: inset 0px 0px 2px 2px transparent;
 }
 
 #workspaces button:hover {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(1, 1, 1, 0.2);
     box-shadow: inherit;
 }
 
@@ -127,8 +124,7 @@ window#waybar.chromium { background-color: #000000; border: none; }
 button {
     box-shadow: inset 0px 0px transparent;
     border: none;
-    border-radius: 0;
-    margin: 0px 5px;
+    margin: 0px 4px;
 }
 
 button:hover {
@@ -226,7 +222,7 @@ menuitem:disabled {
 
 #memory { color: @memory_fg; font-weight: 100; }
 
-#disk { background-color: #964B00; } /* Brown - kept hardcoded as unique */
+#disk { background-color: #964B00; }
 
 #backlight { color: @backlight_fg; font-weight: 100; }
 
@@ -345,7 +341,7 @@ menuitem:disabled {
 #privacy { padding: 0; }
 
 #privacy-item {
-    padding: 0px 5px;
+    padding: 0px 3px;
     color: white;
 }
 
@@ -373,15 +369,13 @@ menuitem:disabled {
 
 #keyboard-state {
     color: @clock_fg;
-    padding: 0px 5px;
     margin: 4px;
-    min-width: 16px;
     border-radius: 8%;
 }
 
 #keyboard-state > label {
     color: #666666;
-    padding: 0px 5px;
+    padding: 0px 3px;
 }
 
 #keyboard-state > label.locked {
@@ -389,9 +383,23 @@ menuitem:disabled {
     background: rgba(0, 0, 0, 0.2);
 }
 
-#scratchpad,
+#scratchpad {
+    color: @scratchpad_fg;
+    background: @scratchpad_bg;
+}
+
 #scratchpad.empty {
     color: @scratchpad_fg;
     background: @scratchpad_bg;
+}
+
+#mpris.playing {
+    color: @now_playing_active;
+    min-width: 10px;
+}
+
+#mpris.paused {
+    color: transparent;
+    background: transparent;
 }
 
