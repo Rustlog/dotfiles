@@ -2,24 +2,31 @@
 
 builtin set -euo pipefail
 
+NO_COLOR=0
+
 function log() {
     local _type="${1}"; shift
     local _color="" _t=""
-    local -g info_color="\033[38;2;85;255;126m" \
-        warn_color="\033[38;2;255;170;10m" \
-        error_color="\033[38;2;244;29;31m" \
-        fatal_color="\033[5m\033[38;2;255;0;0m" \
-        other_color="\033[38;2;251;255;208m" \
-        nc="\033[0m"
+    if [[ $NO_COLOR -eq 0 ]]; then
+        local -g _info_color="\033[38;2;85;255;126m" \
+            _warn_color="\033[38;2;255;170;10m" \
+            _error_color="\033[38;2;244;29;31m" \
+            _fatal_color="\033[5m\033[38;2;255;0;0m" \
+            _other_color="\033[38;2;251;255;208m" \
+            _nc="\033[0m"
+    else
+        _info_color="" _warn_color="" _error_color=""
+        _fatal_color="" _other_color="" _nc=""
+    fi
     case "${_type}" in
-        info) _color="${info_color}" _t="*" ;;
-        warn) _color="${warn_color}" _t="^" ;;
-        error) _color="${error_color}" _t="!" ;;
-        fatal) _color="${fatal_color}" _t="#" ;;
-        *) _color="${other_color}" _t="" ;;
+        info) _color="${_info_color:-""}" _t="*"    ;;
+        warn) _color="${_warn_color:-""}" _t="^"    ;;
+        error) _color="${_error_color:-""}" _t="!"  ;;
+        fatal) _color="${_fatal_color:-""}" _t="#"  ;;
+        *) _color="${_other_color-""}" _t=""        ;;
     esac
 
-    printf "[%b%s%b%s]: %b\n" "${_color}" "${_type}" "${nc}" "${_t}" "${*}"
+    printf "[%b%s%b%s]: %b\n" "${_color}" "${_type}" "${_nc}" "${_t}" "${*}"
 }
 
 function main() {

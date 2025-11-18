@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Main config file: files and directory mapping
-CONFIG_FILE="${HOME}/.custom/${0##*/}/config"
+CONFIG_FILE="${HOME}/.config/custom/${0##*/}/config"
 
 # command in use to copy stuff
 SYNC_="rsync"
@@ -92,7 +92,7 @@ EOF
     then
         log info "Created: '$(ColorPath "${config_file}")'"
     else
-        log error "Creating '$(ColorPath "${config_file}")'"
+        log error "Error creating '$(ColorPath "${config_file}")'"
         return 1
     fi
     return 0
@@ -135,6 +135,7 @@ function SourceConfig() {
     else
         log error "'$(ColorPath "${config_file}")' not found"
         CreateConfig "${config_file}"
+        source "${config_file}" || log error "Failed to source '${config_file}'"
     fi
     return 0
 }
@@ -171,7 +172,7 @@ function CopyFiles() {
         return 1
     fi
 
-    mkdir --parents -- "$(dirname "${dest_}")"
+    mkdir -p "${dest_%/*}"
 
     if [[ "$SYNC_" == "rsync" ]]; then
         [[ $LOG_LEVEL -ge 2 ]] && cmd_flags+=( "--progress" )
@@ -205,7 +206,7 @@ function CopyDirs() {
         return 1
     fi
 
-    mkdir --parents -- "${dest_}"
+    mkdir -p "${dest_}"
 
     if [[ "$SYNC_" == "rsync" ]]; then
         [[ $LOG_LEVEL -ge 2 ]] && cmd_flags+=( "--progress" )
@@ -352,7 +353,6 @@ function main() {
     # Clone directory
     local clone_dir=""
 
-    # string '--force'
     local force=""
 
     for ((i=0;i<${#flagArr[@]};i++)); do
@@ -432,6 +432,8 @@ function main() {
         esac
     done
 
+    mkdir -p "${CONFIG_FILE%/*}"
+
     SourceConfig "${CONFIG_FILE}"
 
     [[ $show_help -eq 1 ]] && { Usage; return 0; }
@@ -451,10 +453,9 @@ function main() {
         SYNC_="cp"
     fi
 
-    # Why local dotfile directory doesn't exist
     if [[ ! -d "${GIT_DIR}" ]]; then
         log info "$(ColorPath "${GIT_DIR}") doesn't exist"
-        if mkdir --parents "${GIT_DIR}"; then
+        if mkdir -p "${GIT_DIR}"; then
             log info "Created $(ColorPath "${GIT_DIR}")"
         else
             log error "Cannot create '${BLUE}${GIT_DIR}${NC}'"

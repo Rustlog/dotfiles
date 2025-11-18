@@ -1,11 +1,14 @@
 # Personal dotfiles
 
-## This is my personal configuration file repository for my Void Linux setup.
+## This is a personal dotfile repo for the Void Linux setup.
 
-## Screenshot
+## Screenshot1
 ![](docs/images/void-linux-fastfetch-output.webp)
+## Screenshot2
+![](docs/images/void-linux-)
 
 #### Core configuration (Main setup):
+- **Scripts:** [Handy scripts (MountSSH, Dotsync, JournalToday and more)](scripts/)
 - **Sway**: [~/.config/sway/config](sway/config)
 - **Waybar**: [~/.config/sway/waybar](sway/waybar/)
 - **Neovim**: [/etc/xdg/nvim/init.vim](neovim/init.vim)
@@ -14,7 +17,6 @@
 - **Foot**: [~/.config/foot/foot.ini](foot/foot.ini)
 - **Wofi**: [~/.config/wofi](wofi/)
 - **ArchSetup**: [Setup scripts for Arch Linux](ArchSetup/)
-- **Scripts:** [Handy scripts (PlayMusic, MountSSH, Encrypt, and more)](scripts/)
 - **Yazi**: [~/.config/yazi](yazi/)
 
 #### Others (Not used often)

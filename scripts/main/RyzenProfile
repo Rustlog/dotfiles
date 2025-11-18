@@ -5,14 +5,13 @@ set -euo pipefail
 # Default values for the service
 if command -v "systemctl" &> /dev/null; then
     SYSTEM="systemd"
-    DEFAULT_SYSTEMD_DIR="/usr/lib/systemd/system"
-    DEFAULT_SERVICE_NAME="ryzen-profile.service"
 elif command -v "runit" &> /dev/null; then
     SYSTEM="runit"
-    DEFAULT_SYSTEMD_DIR="/etc/sv"
-    DEFAULT_SERVICE_NAME="ryzen-profile"
 fi
 
+SCRIPT_NAME="$(readlink -f "${0}")"
+SCRIPT_NAME="${SCRIPT_NAME##*/}"
+CONFIG_FILE="/etc/${SCRIPT_NAME}"
 DEFAULT_RYZENADJ_PATH="$(command -v ryzenadj)"
 
 function log() {
@@ -26,152 +25,224 @@ function log() {
 
 # Usage of this script
 function Usage() {
-    local script_name="${0##*/}"
     printf '%b\n' \
-        "Usage: ${script_name} [OPTIONS]" \
+        "Usage: ${SCRIPT_NAME} [OPTIONS]" \
         "" \
-        "Create, update, or manage a init (${SYSTEM}) service that applies a Ryzen power profile" \
-        "with ryzenadj." \
+        "Desc: Create, update, or manage a init (${SYSTEM}) service that applies a Ryzen power profile at boot" \
+        "      using ryzenadj (AMD CPU only)." \
         "" \
         "Options:" \
-        "  -n, --name=NAME           Service name (default: ${DEFAULT_SERVICE_NAME})" \
-        "  -d, --dir=DIR             ${SYSTEM^} unit directory (default: ${DEFAULT_SYSTEMD_DIR})" \
-        "  -p, --profile=PROFILE     Predefined profile for ${SYSTEM} (default: balanced):" \
-        "                              extreme_save, ultra_save, powersave, eco," \
-        "                              balanced_low, balanced, stock, performance" \
-        "                              or 'custom'" \
-        "  -a, --args=ARGS           Custom ryzenadj arguments (required for 'custom';" \
-        "                              overrides the selected profile)" \
-        "  -r, --ryzenadj-path=PATH  Path to ryzenadj binary (default: ${DEFAULT_RYZENADJ_PATH})" \
-        "  -i, --install             Install profile, without this profile won't install" \
-        "  -u, --uninstall           Uninstall the ${SYSTEM} service" \
-        "  -c, --check               Check if the ${SYSTEM} service exists and is enabled" \
-        "  -h, --help                Show this help message" \
+        "  -a, -apply               Restart the init (${SYSTEM}) service (applies current profile)" \
+        "  -n, -name=NAME           Service name (default: '${SCRIPT_NAME}')" \
+        "  -l, -list                List available profiles and currently active profile" \
+        "  -s, -set                 Set a profile in (${CONFIG_FILE}), conjunction with -p" \
+        "  -p, -profile=PROFILE     Predefined profile for ${SYSTEM} system (default: balanced):" \
+        "                             extreme_save, ultra_save, powersave, eco," \
+        "                             balanced_low, balanced, stock, performance" \
+        "                             or 'custom'" \
+        "  -a, -args=ARGS           Custom ryzenadj arguments (required for 'custom';" \
+        "                             overrides the selected profile)" \
+        "  -r, -ryzenadj-path=PATH  Path to ryzenadj binary (default: ${DEFAULT_RYZENADJ_PATH})" \
+        "  -i, -install             Install profile, without this script won't install" \
+        "  -u, -uninstall           Uninstall the ${SYSTEM} service" \
+        "  -c, -check               Check if the ${SYSTEM} service exists and is enabled" \
+        "  -h, -help                Show this help message" \
         "" \
         "Examples:" \
-        "  ${script_name} -i -p=performance                                        # High-performance mode" \
-        "  ${script_name} -i -p=eco                                                # Efficient daily use" \
-        "  ${script_name} -i -p=custom -a='--stapm-limit=65000 --max-performance'  # Custom args for ryzenadj" \
-        "  ${script_name} -u                                                       # Uninstall service" \
+        "  ${SCRIPT_NAME} -i -p=performance                                        # Usually near OEM default" \
+        "  ${SCRIPT_NAME} -i -p=eco                                                # Efficient daily use" \
+        "  ${SCRIPT_NAME} -i -p=custom -a='--stapm-limit=65000 --max-performance'  # Custom args for ryzenadj" \
+        "  ${SCRIPT_NAME} -u                                                       # Uninstall service" \
         "" \
         "" \
-        "Profiles:" \
-        "    extreme_save : ~15 W STAPM, 70 °C Tctl, 30 °C skin. Ultra-silent, battery-life-first (web, docs, idle)." \
-        "    ultra_save   : ~20 W STAPM, 75 °C Tctl, 32 °C skin. Very low power, still usable for light office work." \
-        "    powersave    : ~25 W STAPM, 78 °C Tctl, 34 °C skin. Conservative daily driver." \
-        "    eco          : ~28 W STAPM, 80 °C Tctl, 36 °C skin. Efficient balance – good for mixed workloads." \
-        "    balanced_low : ~32 W STAPM, 84 °C Tctl, 40 °C skin. Quiet \"normal\" mode, lower fan noise than stock." \
-        "    balanced     : ~35 W STAPM, 88 °C Tctl, 45 °C skin. OEM-like default, solid all-round performance." \
-        "    stock        : ~35.4 W STAPM, 90 °C Tctl, 50 °C skin. Exact factory defaults – no --power-saving flag." \
-        "    performance  : ~38 W STAPM, 92 °C Tctl, 50 °C skin. Sustained boost, higher clocks, louder fans." \
-        "    custom       : Use -a to pass any ryzenadj flags you want."
+        "Available profiles:" \
+        "    extreme_save ultra_save powersave eco balanced_low balanced stock custom performance"
 
     exit 0
 }
 
-# Function to get profile-specific args
-function Get_profile_args() {
-    local profile="${1}"
+function Install_POSIX_Script() {
+    local file="${1}"
+    local ryzenadj_path="${2}"
+cat > "${file}" << EOF
+#!/usr/bin/env sh
 
-    local -a extreme_save=(
-        "--stapm-limit=15000" "--fast-limit=18000"
-        "--slow-limit=15000" "--apu-slow-limit=15000"
-        "--vrm-current=30000" "--vrmmax-current=50000"
-        "--tctl-temp=70" "--apu-skin-temp=30"
+## Set a ryzen power profile at boot
+
+exec 2>&1
+
+## Available Ryzen profiles
+extreme_save() {
+    set -- "--stapm-limit=15000" "--fast-limit=18000" \\
+        "--slow-limit=15000" "--apu-slow-limit=15000" \\
+        "--vrm-current=30000" "--vrmmax-current=50000" \\
+        "--tctl-temp=70" "--apu-skin-temp=30" \\
         "--dgpu-skin-temp=45" "--power-saving"
-    )
+    printf "%s " "\${@}"
+}
 
-    local -a ultra_save=(
-        "--stapm-limit=20000" "--fast-limit=22000"
-        "--slow-limit=20000" "--apu-slow-limit=20000"
-        "--vrm-current=35000" "--vrmmax-current=60000"
-        "--tctl-temp=75" "--apu-skin-temp=32"
+ultra_save() {
+    set -- "--stapm-limit=20000" "--fast-limit=22000" \\
+        "--slow-limit=20000" "--apu-slow-limit=20000" \\
+        "--vrm-current=35000" "--vrmmax-current=60000" \\
+        "--tctl-temp=75" "--apu-skin-temp=32" \\
         "--dgpu-skin-temp=48" "--power-saving"
-    )
+    printf "%s " "\${@}"
+}
 
-    local -a powersave=(
-        "--stapm-limit=25000" "--fast-limit=28000"
-        "--slow-limit=25000" "--apu-slow-limit=25000"
-        "--vrm-current=38000" "--vrmmax-current=70000"
-        "--tctl-temp=78" "--apu-skin-temp=34"
+powersave() {
+    set -- "--stapm-limit=25000" "--fast-limit=28000" \\
+        "--slow-limit=25000" "--apu-slow-limit=25000" \\
+        "--vrm-current=38000" "--vrmmax-current=70000" \\
+        "--tctl-temp=78" "--apu-skin-temp=34" \\
         "--dgpu-skin-temp=50" "--power-saving"
-    )
+    printf "%s " "\${@}"
+}
 
-    local -a eco=(
-        "--stapm-limit=28000" "--fast-limit=30000"
-        "--slow-limit=28000" "--apu-slow-limit=28000"
-        "--vrm-current=40000" "--vrmmax-current=75000"
-        "--tctl-temp=80" "--apu-skin-temp=36"
+eco() {
+    set -- "--stapm-limit=28000" "--fast-limit=30000" \\
+        "--slow-limit=28000" "--apu-slow-limit=28000" \\
+        "--vrm-current=40000" "--vrmmax-current=75000" \\
+        "--tctl-temp=80" "--apu-skin-temp=36" \\
         "--dgpu-skin-temp=50" "--power-saving"
-    )
+    printf "%s " "\${@}"
+}
 
-    local -a balanced_low=(
-        "--stapm-limit=32000" "--fast-limit=34000"
-        "--slow-limit=32000" "--apu-slow-limit=32000"
-        "--vrm-current=45000" "--vrmmax-current=80000"
-        "--tctl-temp=84" "--apu-skin-temp=40"
+balanced_low() {
+    set -- "--stapm-limit=32000" "--fast-limit=34000" \\
+        "--slow-limit=32000" "--apu-slow-limit=32000" \\
+        "--vrm-current=45000" "--vrmmax-current=80000" \\
+        "--tctl-temp=84" "--apu-skin-temp=40" \\
         "--dgpu-skin-temp=52" "--power-saving"
-    )
+    printf "%s " "\${@}"
+}
 
-    local -a balanced=(
-        "--stapm-limit=35000" "--fast-limit=40000"
-        "--slow-limit=35000" "--apu-slow-limit=35000"
-        "--vrm-current=50000" "--vrmmax-current=90000"
-        "--tctl-temp=88" "--apu-skin-temp=45"
+balanced() {
+    set -- "--stapm-limit=35000" "--fast-limit=40000" \\
+        "--slow-limit=35000" "--apu-slow-limit=35000" \\
+        "--vrm-current=50000" "--vrmmax-current=90000" \\
+        "--tctl-temp=88" "--apu-skin-temp=45" \\
         "--dgpu-skin-temp=55" "--power-saving"
-    )
+    printf "%s " "\${@}"
+}
 
-    local -a stock=(
-        "--stapm-limit=35400" "--fast-limit=45000"
-        "--slow-limit=35400" "--apu-slow-limit=35400"
-        "--vrm-current=55000" "--vrmmax-current=95000"
-        "--tctl-temp=90" "--apu-skin-temp=50"
-        "--dgpu-skin-temp=60"
-        # no --power-saving -> allows boost
-    )
+performance() {
+    set -- "--stapm-limit=38000" "--fast-limit=48000" \\
+    "--slow-limit=38000" "--apu-slow-limit=38000" \\
+    "--vrm-current=60000" "--vrmmax-current=100000" \\
+    "--tctl-temp=92" "--apu-skin-temp=50" \\
+    "--dgpu-skin-temp=62"
+    printf "%s " "\${@}"
+}
 
-    local -a performance=(
-        "--stapm-limit=38000" "--fast-limit=48000"
-        "--slow-limit=38000" "--apu-slow-limit=38000"
-        "--vrm-current=60000" "--vrmmax-current=100000"
-        "--tctl-temp=92" "--apu-skin-temp=50"
-        "--dgpu-skin-temp=62"
-    )
+stock() {
+    set --
+    printf "%s " "\${@}"
+}
 
-    # Return the selected profile
-    case "${profile}" in
-        extreme_save|extreme-save) printf '%s\n' "${extreme_save[*]}";;
-        ultra_save|ultra-save)   printf '%s\n' "${ultra_save[*]}";;
-        powersave)    printf '%s\n' "${powersave[*]}";;
-        eco)          printf '%s\n' "${eco[*]}";;
-        balanced_low) printf '%s\n' "${balanced_low[*]}";;
-        balanced)     printf '%s\n' "${balanced[*]}";;
-        stock)        printf '%s\n' "${stock[*]}";;
-        performance)  printf '%s\n' "${performance[*]}";;
-        *)            echo "Unknown profile: $profile" >&2; return 1;;
-    esac
+SCRIPT_NAME="\$(readlink -f "\${0}")"
+SCRIPT_NAME="\${SCRIPT_NAME%/*}"
+SCRIPT_NAME="\${SCRIPT_NAME##*/}"
+
+DEFAULT_PROFILE="${DEFAULT_PROFILE}"
+
+CONFIG_FILE="/etc/\${SCRIPT_NAME}"
+
+if [ ! -f "\${CONFIG_FILE}" ]; then
+cat 1> \${CONFIG_FILE} << EOL
+#/usr/bin/env sh
+# Default profile
+PROFILE=\${DEFAULT_PROFILE}
+EOL
+fi
+
+KEY_VALUE_PAIR="\$(grep -o "PROFILE=.*" "\${CONFIG_FILE}")"
+
+[ "\${KEY_VALUE_PAIR%%=*}" = "PROFILE" ] || \\
+    { printf '[error]: %s\n' "PROFILE variable missing from config file (\${CONFIG_FILE})"; exit 1; }
+[ -n "\${KEY_VALUE_PAIR##*=}" ] || \\
+    { printf '[error]: %s\n' "PROFILE value missing from config file (\${CONFIG_FILE})"; exit 1; }
+
+PROFILE="\${KEY_VALUE_PAIR##*=}"
+PROFILE="\${PROFILE:-"powersave"}"
+
+# Set a profile from config file
+
+# shellcheck disable=SC2046
+set -- \$(\${PROFILE})
+
+${ryzenadj_path} "\${@}" || \
+    { printf '[error]: %s\n' "Failed to set values"; exit 1; }
+
+printf '[info]: %s\n' "Successfully applied profile: '\${PROFILE}'"
+
+if command -v runit &> /dev/null; then
+    exec chpst -b "RyzenProfile (\${PROFILE})" pause
+else
+    exec tail -f /dev/null || exec sleep 8000000000
+fi
+
+EOF
+}
+
+function ListProfiles() {
+    local available_profiles=""
+    if [[ ! -s "${POSIX_SCRIPT}" ]]; then
+        log error "Script not fount at '${POSIX_SCRIPT}'"
+        return 1
+    fi
+    printf 'Available Profiles:\n'
+    available_profiles="$(grep -Eo '^[A-Za-z_].*\(\)[[:space:]]' "${POSIX_SCRIPT}" | sed 's/[\(\)]//g' | xargs)"
+    printf '    %s\n' "${available_profiles}"
+    printf 'Active profile:\n'
+    printf '    %s\n' "$(grep -o '^PROFILE=.*' "${CONFIG_FILE}" | sed 's/PROFILE=//g')"
+}
+
+function SetProfile() {
+    [[ -n "${DEFAULT_PROFILE}" ]] || { log error "Default profile not set"; return 1; }
+
+    if [[ -s "${CONFIG_FILE}" ]]; then
+        if sudo sed -i "/^PROFILE=.*/c\PROFILE=${DEFAULT_PROFILE}" "${CONFIG_FILE}"; then
+            log info "Profile: '${DEFAULT_PROFILE}' set in Config: '${CONFIG_FILE}'"
+        else
+            log error "Failed to set '${DEFAULT_PROFILE}' in '${CONFIG_FILE}'"
+        fi
+    else
+        local temp_file="$(mktemp)"
+        cat > "${temp_file}" << EOF
+#/usr/bin/env sh
+# Default profile
+PROFILE=${DEFAULT_PROFILE}
+EOF
+        sudo mv "${temp_file}" "${CONFIG_FILE}"
+    fi
 }
 
 # Function to create or update the systemd unit file
 function Create_or_Update_systemd_unit() {
-    local unit_file="${1}"
-    local exec_start_args="${2}"
-    local ryzenadj_path="${3}"
-    local profile="${4}"
-
-    # Use a temporary file to build the unit
+    local ryzenadj_path="${1}"
+    local RyzenProfileScript="${2}"
     local temp_file=""
-    temp_file="$(mktemp)"
-    trap 'rm -f "${temp_file}"' EXIT
 
-    # Write the content
+    temp_file="$(mktemp)"
+
+    # Create script
+    Install_POSIX_Script "${temp_file}" "${ryzenadj_path}"
+    # Install script
+    sudo mkdir -p "${RyzenProfileScript%/*}"
+    sudo mv "${temp_file}" "${RyzenProfileScript}"
+    sudo chown root:root "${RyzenProfileScript}"
+    sudo chmod 766 "${RyzenProfileScript}"
+
+    # Install systemd service
+    temp_file="$(mktemp)"
     printf '%s\n' \
         "[Unit]" \
-        "Description=Set a ryzen power profile at boot (profile applied: ${profile})" \
+        "Description=RyzenProfile manager" \
         "After=multi-user.target" \
         "" \
         "[Service]" \
-        "ExecStart=${ryzenadj_path} ${exec_start_args}" \
+        "ExecStart=${RyzenProfileScript}" \
         "Type=oneshot" \
         "Restart=on-failure" \
         "RemainAfterExit=yes" \
@@ -180,65 +251,49 @@ function Create_or_Update_systemd_unit() {
         "WantedBy=multi-user.target" \
         "" 1> "${temp_file}"
 
-    # Compare with existing file and update if different
-    if [[ -f "${unit_file}" ]] && cmp -s "${temp_file}" "${unit_file}"; then
-        log info "Unit file ${unit_file} is already up-to-date."
-    else
-        sudo cp "${temp_file}" "${unit_file}" || { log error "Failed to write unit file."; exit 1; }
-        rm -f "${temp_file}"
-        log info "Unit file ${unit_file} created/updated."
-    fi
+    sudo mv "${temp_file}" "${SERVICE_UNIT_FILE}" || \
+        { log error "Failed to install systemd service (${SERVICE_UNIT_FILE})"; exit 1; }
+    log info "Systemd service '${SERVICE_UNIT_FILE}' installed."
 }
 
 # Function to create or update the runit service file
 function Create_or_Update_runit_unit() {
-    local service_file="${1}"
-    local service_dir="${service_file%%/"${service_file##*/}"}"
-    local exec_start_args="${2}"
-    local ryzenadj_path="${3}"
-
-    # Use a temporary file to build the unit
-    local temp_file
+    local ryzenadj_path="${1}"
+    local service_dir="${SERVICE_UNIT_FILE%/*}"
+    local temp_file=""
 
     temp_file="$(mktemp)"
 
-    # Write the content
-    printf '%s\n' \
-        "#!/bin/sh" \
-        "" \
-        "exec 2>&1" \
-        "" \
-        "# Description: Set a ryzen power profile at boot (porfile applied: ${profile})" \
-        "" \
-        "${ryzenadj_path} ${exec_start_args}" \
-        "" \
-        "exec chpst -b \"Ryzen power profile at boot (porfile: ${profile})\" pause" \
-        "" 1> "${temp_file}"
+    # Create a POSIX script
+    Install_POSIX_Script "${temp_file}" "${ryzenadj_path}"
 
-    { sudo mkdir -p "${service_dir}" && sudo touch "${service_file}"; } || \
-        log error "Failed to craete '${service_dir}'"
+    { sudo mkdir -p "${service_dir}" && sudo touch "${SERVICE_UNIT_FILE}"; } || \
+        log error "Failed to create '${service_dir}'"
 
     # Compare with existing file and update if different
-    if [[ -f "${service_file}" ]] && cmp -s "${temp_file}" "${service_file}"; then
-        log info "Unit file ${service_file} is already up-to-date."
-    else
-        sudo mv "${temp_file}" "${service_file}" || { log error "Failed to write unit file"; exit 1; }
-        sudo chmod +x "${service_file}" && sudo chown root:root "${service_file}"
+    if [[ -f "${SERVICE_UNIT_FILE}" ]] && cmp -s "${temp_file}" "${SERVICE_UNIT_FILE}"; then
+        log info "Unit file ${SERVICE_UNIT_FILE} is already up-to-date"
         rm -f "${temp_file}" &> /dev/null
-        log info "Unit file '${service_file}' created/updated."
+    else
+        sudo mv "${temp_file}" "${SERVICE_UNIT_FILE}" || \
+            { log error "Failed to install runit service (${SERVICE_UNIT_FILE})"; exit 1; }
+        sudo chown root:root "${SERVICE_UNIT_FILE}" && sudo chmod 766 "${SERVICE_UNIT_FILE}"
+        rm -f "${temp_file}" &> /dev/null
+
+        log info "Runit service '${SERVICE_UNIT_FILE}' installed"
     fi
 
     temp_file="$(mktemp)"
-
-    sudo mkdir -p "${service_dir}/log"
 
     printf '%s\n' \
         "#!/bin/sh" \
         "" \
         "exec vlogger -t ${service_name} -p daemon" \
         "" 1> "${temp_file}"
+
+    sudo mkdir -p "${service_dir}/log/"
     sudo mv "${temp_file}" "${service_dir}/log/run"
-    sudo chmod +x "${service_dir}/log/run" && sudo chown root:root "${service_dir}/log/run"
+    sudo chown root:root "${service_dir}/log/run" && sudo chmod 766 "${service_dir}/log/run"
 }
 
 function Enable_runit_service() {
@@ -256,20 +311,18 @@ function Enable_runit_service() {
 # Function to uninstall the service
 function Uninstall_systemd_service() {
     local service_name="${1}"
-    local unit_file="${2}"
 
     if systemctl is-active --quiet "${service_name}"; then
         sudo systemctl stop "${service_name}" || { log warning "Failed to stop service."; }
     fi
     sudo systemctl disable "${service_name}" 2>/dev/null || { log warning "Failed to disable service."; }
-    sudo rm -f "${unit_file}" || { log warning "Failed to remove unit file."; }
+    sudo rm -f "${SERVICE_UNIT_FILE}" || { log warning "Failed to remove unit file."; }
     sudo systemctl daemon-reload
     log info "Service ${service_name} uninstalled."
 }
 
 function Uninstall_runit_service() {
     local service_name="${1}"
-    local unit_file="${2}"
 
     local service_dir
     [[ -L "/var/service" ]] && service_dir="/var/service" || service_dir="/etc/runit/runsvdir/current/"
@@ -283,52 +336,39 @@ function Uninstall_runit_service() {
         log error "Failed to uninstall '${service_name}' service"
 }
 
-# Function to check service status
-function Check_service() {
-    local service_name="${1}"
-    if [[ "${SYSTEM}" == "systemd" ]]; then
-        if systemctl is-enabled --quiet "${service_name}"; then
-            log info "Service ${service_name} is enabled."
-            systemctl status "${service_name}" --no-pager
-        else
-            log info "Service ${service_name} is not installed or enabled."
-        fi
-    elif [[ "${SYSTEM}" == "runit" ]]; then
-        if sudo sv status "${service_name}"; then
-            log info "Service ${service_name} is enabled."
-        else
-            log info "Service ${service_name} is not installed or enabled."
-        fi
-    fi
-}
-
 # Main function
 function main() {
-    local systemd_dir="${DEFAULT_SYSTEMD_DIR}"
-    local service_name="${DEFAULT_SERVICE_NAME}"
-    local profile="balanced"
-    local custom_args=""
+    local -a args=("${@}")
+    local -i uninstall=0 install=0 check_service=0 set_profile=0
+    local -i should_list_profiles=0 apply_profile=0
+    local -g DEFAULT_PROFILE="balanced"
+    local -g SERVICE_UNIT_FILE=""
+    local -g POSIX_SCRIPT=""
+    local service_name="${SCRIPT_NAME}"
     local ryzenadj_path="${DEFAULT_RYZENADJ_PATH}"
-    local uninstall=false
-    local install=false
-    local check=false
 
     # Parse arguments
-    for arg in "${@}"; do
+    local arg="" value=""
+    for ((i=0;i<${#args[@]};i++)); do
+        arg="${args[$i]}"
+        [[ -n "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
+            value="${args[$((i+1))]:-""}" i=$((i+1))
         if [[ "${arg}" == *=* ]]; then
             IFS=$'=' read -r arg value <<< "${arg}"
             [[ -n "${value}" ]] || log error "'${arg}' requires a value"
         fi
+        [[ "${arg}" == --* ]] && arg="${arg//--/-}"
         case "${arg}" in
-            -n|--name) service_name="${value}" ;;
-            -d|--dir) systemd_dir="${value}" ;;
-            -p|--profile) profile="${value}" ;;
-            -a|--args) custom_args="${value}" ;;
-            -r|--ryzenadj-path) ryzenadj_path="${value}" ;;
-            -u|--uninstall) uninstall=true ;;
-            -i|--install) install=true ;;
-            -c|--check) check=true ;;
-            -h|--help) Usage ;;
+            -a|-apply) apply_profile=1 ;;
+            -n|-name) service_name="${value}" ;;
+            -s|-set) set_profile=1 ;;
+            -p|-profile) DEFAULT_PROFILE="${value}" ;;
+            -l|-list*) should_list_profiles=1 ;;
+            -r|-ryzenadj-path) ryzenadj_path="${value}" ;;
+            -u|-uninstall) uninstall=1 ;;
+            -i|-install) install=1 ;;
+            -c|-check) check_service=1 ;;
+            -h|-help) Usage ;;
             *) log error "Unknown option: '${arg}'"; Usage ;;
         esac
     done
@@ -339,54 +379,75 @@ function main() {
         return 1
     fi
 
-    sudo -v || { log error "sudo access required."; return 1; }
-
-    if [[ "${SYSTEM}" == "systemd" ]]; then
-        local unit_file="${systemd_dir}/${service_name}"
-    elif [[ "${SYSTEM}" == "runit" ]]; then
-        local unit_file="/etc/sv/${service_name}/run"
-    fi
-
-    if [[ "${uninstall}" == true ]]; then
-        [[ "${SYSTEM}" == "systemd" ]] && Uninstall_systemd_service "${service_name}" "${unit_file}"
-        [[ "${SYSTEM}" == "runit" ]] && Uninstall_runit_service "${service_name}" "${unit_file}"
-        return 0
-    fi
-
-    if [[ "${check}" == true ]]; then
-        Check_service "${service_name}"
-        return 0
-    fi
-
-    # Get args based on profile
-    local exec_start_args
-    if [[ "${profile}" == "custom" ]]; then
-        exec_start_args="${custom_args}"
-    else
-        exec_start_args="$(Get_profile_args "${profile}")"
-    fi
-
-    if [[ "${install}" == false ]]; then
-        log error "Please use --install flag to install service"
-        return 0
-    fi
-
     log info "Init system: ${SYSTEM}"
 
+    [[ $set_profile -eq 1 ]] && SetProfile
+
     if [[ "${SYSTEM}" == "systemd" ]]; then
+        SERVICE_UNIT_FILE="/etc/systemd/system/${service_name}.service"
+        POSIX_SCRIPT="/usr/local/bin/${SCRIPT_NAME}"
+
+        # List the available profiles in POSIX script
+        [[ ${should_list_profiles} -eq 1 ]] && ListProfiles
+
+        # Check service status
+        if [[ "${check_service}" -eq 1 ]]; then
+            if systemctl is-enabled --quiet "${service_name}"; then
+                log info "Service ${service_name} is enabled."
+                systemctl status "${service_name}" --no-pager
+            else
+                log info "Service ${service_name} is not installed or enabled."
+            fi
+        fi
+
+        # Apply profile immediately
+        [[ $apply_profile -eq 1 ]] && \
+            { sudo systemctl restart "${service_name}"; log info "Successfully restarted service"; }
+
+        # Uninstall service if requested
+        [[ "${uninstall}" -eq 1 ]] && \
+            { Uninstall_systemd_service "${service_name}" "${SERVICE_UNIT_FILE}"; return 0; }
+
+        [[ $install -ne 1 ]] && return 0
+
         # Create or update the systemd unit
-        Create_or_Update_systemd_unit "${unit_file}" "${exec_start_args}" "${ryzenadj_path}" "${profile}"
+        Create_or_Update_systemd_unit "${ryzenadj_path}" "${DEFAULT_PROFILE}"
 
         # Reload and enable
         sudo systemctl daemon-reload || { log error "Failed to reload systemd daemon."; return 1; }
         if sudo systemctl enable --now "${service_name}"; then
-            log info "Service '${service_name}' enabled and started with profile '${profile}'."
+            log info "Service '${service_name}' enabled and started with profile '${DEFAULT_PROFILE}'."
         else
             log error "Failed to enable/start service: '${service_name}'"
         fi
     elif [[ "${SYSTEM}" == "runit" ]]; then
+        SERVICE_UNIT_FILE="/etc/sv/${service_name}/run"
+        POSIX_SCRIPT="${SERVICE_UNIT_FILE}"
+
+        # List the available profiles in POSIX script
+        [[ ${should_list_profiles} -eq 1 ]] && ListProfiles
+
+        # Check service status
+        if [[ "${check_service}" -eq 1 ]]; then
+            if sudo sv status "${service_name}"; then
+                log info "Service ${service_name} is enabled."
+            else
+                log info "Service ${service_name} is not installed or enabled."
+            fi
+        fi
+
+        # Apply profile immediately
+        [[ $apply_profile -eq 1 ]] && \
+            { sudo sv restart "${service_name}"; log info "Successfully restarted service"; }
+
+        # Uninstall service if requested
+        [[ "${uninstall}" -eq 1 ]] && \
+            { Uninstall_runit_service "${service_name}" "${SERVICE_UNIT_FILE}"; return 0; }
+
+        [[ $install -ne 1 ]] && return 0
+
         # Create or update the runit service
-        Create_or_Update_runit_unit "${unit_file}" "${exec_start_args}" "${ryzenadj_path}" "${profile}"
+        Create_or_Update_runit_unit "${ryzenadj_path}" "${DEFAULT_PROFILE}"
 
         # Enable and start service
         Enable_runit_service "${service_name}"

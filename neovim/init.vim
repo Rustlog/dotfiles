@@ -142,7 +142,7 @@ autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") | exe "norm
 
 " C tmeplate
 autocmd BufNewFile *.c call setline(1, [
-    \ '//usr/bin/env gcc -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '//usr/bin/env gcc -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
     \ '',
     \ '# include <stdio.h>',
     \ '',
@@ -158,7 +158,7 @@ autocmd BufNewFile *.c call setline(1, [
 
 " C++ tmeplate
 autocmd BufNewFile *.cpp,*.cxx,*.cc,*.c++ call setline(1, [
-    \ '//usr/bin/env gcc -lstdc++ -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '//usr/bin/env gcc -lstdc++ -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
     \ '',
     \ '# include <iostream>',
     \ '',

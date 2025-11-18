@@ -243,13 +243,13 @@
         "format-linked": "{ifname} (No IP) ",
         "format-ethernet": "{ifname} 󰌘",
         "format-disconnected": "󰌙 Disconnected",
-        "tooltip-format": "SSID: {essid}\nIP: {ipaddr}\nSpeed:  {bandwidthDownBits}  {bandwidthUpBits}\nStrength: {signalStrength}%",
+        "tooltip-format": "SSID: {essid}\nSpeed:  {bandwidthDownBits}  {bandwidthUpBits}\nIP: {ipaddr}\nGateway: {gwaddr}\nMAC: {bssid}\nStrength: {signalStrength}%\nSubnetMask: ipv4: {netmask}, ipv6: {netmask6}",
         "tooltip-format-ethernet": "{ifname} 󰌘",
         "tooltip-format-disconnected": "󰌙 Disconnected",
-        "on-click-right": "foot -a 'Floating' -w 1261x597 bash -c 'RESULT=$(nmcli -colors=yes device wifi list --rescan yes); echo \"${RESULT}\"; read -r -n 1 -s'",
+        "on-click-right": "foot -a Floating -w 1261x597 bash -c 'nmcli -colors=yes dev wifi list --rescan yes; read -r -n 1 -s'",
         "on-double-middle": "notify-send -t 1000 'Double click'",
-        "on-scroll-up": "[[ $(nmcli radio wifi) == disabled ]] && nmcli radio wifi on && notify-send -t 200 'Wifi turned on'",
-        "on-scroll-down": "[[ $(nmcli radio wifi) == enabled ]] && nmcli radio wifi off && notify-send -t 200 'Wifi turned off'"
+        "on-scroll-up": "[ \"$(nmcli radio wifi)\" = \"disabled\" ] && nmcli radio wifi on && notify-send -t 200 'Wifi turned on'",
+        "on-scroll-down": "[ \"$(nmcli radio wifi)\" = \"enabled\" ] && nmcli radio wifi off && notify-send -t 200 'Wifi turned off'"
     },
 
     "pulseaudio": {
@@ -262,7 +262,7 @@
         "on-click": "env GTK_THEME=Breeze:dark pavucontrol",
         "on-click-right": "env XDG_CURRENT_DESKTOP=kde blueman-manager",
         "format-source-muted": " ",
-            "format-icons": {
+        "format-icons": {
             "alsa_output.pci-0000_00_1f.3.analog-stereo": "  ",
             "alsa_output.pci-0000_00_1f.3.analog-stereo-muted": "  ",
             "headphone": " ",

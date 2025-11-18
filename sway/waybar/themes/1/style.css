@@ -41,8 +41,8 @@
 @define-color privacy_screenshare #CF5700;
 @define-color privacy_audio_in   #1CA000;
 @define-color privacy_audio_out  #0069D4;
-@define-color gtk_menu_text      rgba(255, 255, 255, 0.8);
-@define-color gtk_menu_bg        rgba(10, 10, 10, 0.8);
+@define-color gtk_menu_text      rgba(255, 255, 255, 1);
+@define-color gtk_menu_bg        rgba(10, 10, 10, 1);
 
 /* ========================= */
 /* Global reset & typography */

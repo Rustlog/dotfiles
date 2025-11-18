@@ -19,7 +19,7 @@ function Usage() {
 Usage: ${scriptName} [OPTIONS]
 
 OPTIONS:
-    edit, config            Edit the main config file (~/.custom/${scriptName}/config)
+    edit, config            Edit the main config file (~/.config/custom/${scriptName}/config)
     install rule, install rule uuid=UUID
                             Generate udev rule only for the device UUID (run \`lsblk -o NAME,LABEL,FSTYPE,UUID\` to find it)
     install all             Install script (${script_install_path}), udev rules and systemd service (requires root)
@@ -171,7 +171,7 @@ function CreateUdevSyncScript() {
         fi
 
         log info "Installing udev sync script: '${script_path}'"
-        sudo mkdir -p "${script_path%%/${script_path##*/}}"
+        sudo mkdir -p "${script_path%/*}"
     fi
 
     "${write[@]}" "${script_path}" > /dev/null << EOF
@@ -296,7 +296,7 @@ function main() {
 
     trap 'Cleanup "\${mountpoint_dir}" "\${led_file}" "\${led_original_state}"; exit 0' EXIT SIGINT SIGTERM
 
-    mkdir -p "\${logfile%%/\${logfile##*/}}"
+    mkdir -p "\${logfile%/*}"
 
     if [[ -f \${logfile} ]]; then
         printf '\n' &>> \${logfile}
@@ -475,7 +475,7 @@ function CreateUdevRule() {
     sudo -v
     if [[ $install -eq 1 ]]; then
         sudo mkdir -p "${rule_dir}"
-        sudo mkdir -p "${rule_file%%/${rule_file##*/}}"
+        sudo mkdir -p "${rule_file%/*}"
         log info "Installing custom udev rule: '${rule_file}'"
     else
         [[ -f "${rule_file}" ]] || { log error "Rule '${rule_file}' does not exist"; return 1; }
@@ -546,7 +546,7 @@ function main() {
     local -a args=("$@")
     # Vars
     local script_name="${0##*/}"
-    local config_dir="${HOME}/.custom/${script_name}"
+    local config_dir="${HOME}/.config/custom/${script_name}"
     local config_file="${config_dir}/config"
     local udev_rule_name=""
     local script_install_path="/opt/bin/${script_name}_"

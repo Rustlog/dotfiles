@@ -126,7 +126,7 @@ function TurnMusicOn() {
             track_num=$((i+1))
             file="${files_joined[$i]}"
             quoted_files+=("'${BLUE}$(ColorPath "${MUSIC_DIR}${NC}")/${LIGHT_SKIN}${file}${NC}'")
-            CURRENTLY_PLAYING+=("$(basename "${MUSIC_DIR}/${file}")")
+            CURRENTLY_PLAYING+=("${file##${file%%${file##*/}}}")
             LOG info "  ${GREY}$track_num${NC} ${LIGHT_SKIN}${CURRENTLY_PLAYING[$i]%.*}${NC}"
         done
         printf '\n'
@@ -150,20 +150,16 @@ function Play() {
 
 function main() {
     local -a ARG_ARR=("$@")
-    local arg=
-    local volume=
-    local video=
+    local volume="" video=""
+    local -i shuffle=0 play_all=0
     local -g loop=0 play_tui_=0
-    local shuffle=0
 
     CheckDependencies
 
+    local arg=""
     for (( i=0 ; i < ${#ARG_ARR[@]} ; i++ )); do
         arg="${ARG_ARR[$i]}"
         case "${arg}" in
-            vid|--vid|--video|video)
-                video="auto"
-                ;;
             vol|--vol--volume|volume)
                 volume=${ARG_ARR[ $((i+1)) ]}
                 [[ -z ${volume} || ${volume} == -* ]] && {
@@ -181,25 +177,17 @@ function main() {
                     LOG info "Default volume: ${BLUE}65${NC}"
                 fi
                 ;;
-            -q|--quiet)
-                QUIET=1
-                ;;
-            -t|-*tui|tui)
-                play_tui_=1
-                ;;
-            -s|--shuff|shuff|--shuffle|shuffle)
-                shuffle=1
-                ;;
-            -h|--help|help)
-                Usage
-                Exit 0
-                ;;
+            vid|--vid|--video|video) video="auto" ;;
+            -q|--quiet) QUIET=1 ;;
+            -t|-*tui|tui) play_tui_=1 ;;
+            -a|-*play*all|play*all|all) play_all=1 ;;
+            -s|--shuff|shuff|--shuffle|shuffle) shuffle=1 ;;
+            -h|--help|help) Usage; Exit 0 ;;
             *)
                 if [[ -d "${arg}" ]];then
                     MUSIC_DIR="${arg}"
                 else
-                Usage
-                Exit 0
+                    Usage; Exit 0
                 fi
                 ;;
         esac
@@ -210,7 +198,11 @@ function main() {
         Exit 1
     }
 
-    mapfile -t SELECTED < <(find "${MUSIC_DIR}" \( -type f -iregex '.*\.\(mp3\|flac\|m4a\|wav\|aac\|ogg\|opus\|wma\|alac\|ape\|mpc\|wavpack\|webm\|mp4\)' \) -printf "%P\n" | fzf --multi)
+    if [[ $play_all -eq 1 ]]; then
+        mapfile -t SELECTED < <(find "${MUSIC_DIR}" \( -type f -iregex '.*\.\(mp3\|flac\|m4a\|wav\|aac\|ogg\|opus\|wma\|alac\|ape\|mpc\|wavpack\|webm\|mp4\)' \) -printf "%P\n")
+    else
+        mapfile -t SELECTED < <(find "${MUSIC_DIR}" \( -type f -iregex '.*\.\(mp3\|flac\|m4a\|wav\|aac\|ogg\|opus\|wma\|alac\|ape\|mpc\|wavpack\|webm\|mp4\)' \) -printf "%P\n" | fzf --multi)
+    fi
 
     if [[ ${#SELECTED[@]} -eq 0 ]]; then
         LOG info "No song selected"
@@ -220,7 +212,7 @@ function main() {
     fi
 
     [[ $shuffle -eq 1 && $loop -eq 0 ]] && LOG warn "Shuffle can only be used with mutiple tracks"
-    [[ $shuffle -eq 1 ]] && SELECTED=($(printf "%s\n" "${SELECTED[@]}" | shuf))
+    [[ $shuffle -eq 1 ]] && mapfile -t SELECTED <(printf "%s\n" "${SELECTED[@]}" | shuf)
 
     play_tui_flags+=(
         "--vid=${video:-"no"}"

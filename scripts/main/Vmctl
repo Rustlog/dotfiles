@@ -240,7 +240,7 @@ function main() {
 
     local disk_img="" iso_img="" disk_format=""
     local -a requested_profiles=()
-    local -g config_dir="${HOME}/.custom/vmctl"
+    local -g config_dir="${HOME}/.config/custom/vmctl"
     local config_file="${config_dir}/profiles" profile_name=""
     local comment="" create_img=""
 

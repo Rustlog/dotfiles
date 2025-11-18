@@ -15,7 +15,7 @@ builtin set -euo pipefail
 # Operation flags
 ENABLE_DEBUG=0    # Override debug config with --debug flag or manual toggle
 
-builtin readonly PROFILE_DIRECTORY="${HOME}/.custom/${0##*/}"
+builtin readonly PROFILE_DIRECTORY="${HOME}/.config/custom/${0##*/}"
 
 ### Default Config Template (Do not touch it) ###
 declare -A CONFIG=(
@@ -762,7 +762,7 @@ function FindProfile() {
 # Sets flags for conditional execution later
 # Main logic of the script
 function main() {
-    local -a ARGS_ARR=("${@}")
+    local -a args=("${@}")
     local -a sshfs_cmd=()
 
     # On-off Flags
@@ -784,40 +784,42 @@ function main() {
     local requested_profile_base=""
 
     local arg="" value=""
-    for ((i=0;i<${#ARGS_ARR[@]};i++)); do
-        arg="${ARGS_ARR[$i]}"
-        [[ ${#ARGS_ARR[@]} -gt ${i} ]] && value="${ARGS_ARR[$((i+1))]:-""}"
+    for ((i=0;i<${#args[@]};i++)); do
+        arg="${args[$i]}"
+        [[ "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
+            value="${args[$((i+1))]:-""}" i=$((i+1))
         if [[ "${arg}" == *=* ]]; then
-            value="${arg##*=}"
-            arg="${arg%%=*}"
+            IFS=$'=' read -r arg value <<< "${arg}"
+            [[ -n "${value}" ]] || \
+                { log error "'${arg}' requires a value"; return 1; }
         fi
+        [[ "${arg}" == --* ]] && arg="${arg//--/-}"
         case "${arg}" in
-            --ssh|ssh)                  should_ssh_=1                         ;;
-            -f|-force|force)            force=1                               ;;
-            --rm|--rem*|rm|rem*)        remove_profile=1                      ;;
-            -m|--mount|mount)           should_mount_=1                       ;;
-            -u|--u*mount|u*mount)       should_unmount_=1                     ;;
-            -e|edit*)                   should_edit_profile=1                 ;;
-            --back*|back*)              backup_profile=1                      ;;
-            --res*|res*)                restore_profile_from_bak=1            ;;
-            -c=*|--con=*|con=*)         config_profile="${value}"             ;;
-            -c|--con*|con*)             config_profile="${value}" i=$((i+1))  ;;
-            --show|show)                should_show_profile_=1                ;;
-            --cat|cat)                  should_cat_profile_=1                 ;;
-            --ssh*mount|ssh*mount)      should_ssh_=1 should_mount_=1         ;;
-            --mount*ssh|mount*ssh)      should_ssh_=1 should_mount_=1         ;;
-            -l|-*list|-*tree|list|tree) should_ls_profile_dir=1               ;;
-            --no-color|--nocolor)       CONFIG["COLORS"]=0 should_use_colors=0  ;;
-            -d|-*debug|debug)           CONFIG["DEBUG"]=1 ENABLE_DEBUG=1        ;;
-            -h|--help|help)             show_usage=1                          ;;
-            -p=*|-*pro*=*|pro*=*)       requested_profile_base="${value}"                                   ;;
-            -p*|--pro*|pro*)            requested_profile_base="${value}" i=$((i+1))                        ;;
-            --sh*pr*=*|sh*pr*=*)        requested_profile_base="${value}" should_show_profile_=1            ;;
-            --sh*pr*|sho*pro*)          requested_profile_base="${value}" should_show_profile_=1 i=$((i+1)) ;;
+            -ssh)               should_ssh_=1                           ;;
+            -f|-force)          force=1                                 ;;
+            -rem*|-rm)          remove_profile=1                        ;;
+            -m|-mount)          should_mount_=1                         ;;
+            -u|-u*mount)        should_unmount_=1                       ;;
+            -e|-edit)           should_edit_profile=1                   ;;
+            -back*)             backup_profile=1                        ;;
+            -res*)              restore_profile_from_bak=1              ;;
+            -c=*|-con=*)        config_profile="${value}"               ;;
+            -c|-con*)           config_profile="${value}" i=$((i+1))    ;;
+            -show)              should_show_profile_=1                  ;;
+            -cat)               should_cat_profile_=1                   ;;
+            -ssh*mount)         should_ssh_=1 should_mount_=1           ;;
+            -mount*ssh)         should_ssh_=1 should_mount_=1           ;;
+            -l|-list|-tree)     should_ls_profile_dir=1                 ;;
+            -d|-*debug)         CONFIG["DEBUG"]=1 ENABLE_DEBUG=1        ;;
+            -h|--help)          show_usage=1                            ;;
+            -p*|--pro*)         requested_profile_base="${value}"       ;;
+            -no-color|--nocolor)CONFIG["COLORS"]=0 should_use_colors=0  ;;
+            -show*pro*)         requested_profile_base="${value}" \
+                                should_show_profile_=1                  ;;
             *)
                 FindProfile "${arg}" "requested_profile_base"
                 if [[ "${requested_profile_base}" != "${arg}" ]]; then
-                    log error "Invalid argument: $arg"
+                    log error "Invalid argument: '${arg}'"
                     FATAL "exit reason: Invalid argument passed" 1
                 fi
                 ;;

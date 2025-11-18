@@ -74,7 +74,7 @@ function Install_sway_desktop() {
     [[ -s "${user_script}" ]] || { log error "No user script found in ~/.bin/"; return 1; }
     log info "Found user script at '${user_script}'"
     sudo cp -f "${user_script}" "${install_file}" && log info "Installed user script at '${install_file}'"
-    sudo mkdir -p "${desktop_session_file%%/"${desktop_session_file##*/}"}" "${install_file%%/"${install_file##*/}"}"
+    sudo mkdir -p "${desktop_session_file%/*}" "${install_file%/*}"
     if sudo tee "${desktop_session_file}" &>/dev/null << EOF
 [Desktop Entry]
 Name=Sway (Wayland Compositor)

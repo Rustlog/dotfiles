@@ -31,7 +31,7 @@ function main() {
     # Default configuration
     local -a args=("${@}")
     local concurrent_downloads=4
-    local download_directory=""
+    local download_directory="$(realpath .)"
     local playlist_url="${args[$((${#args[@]}-1))]}"
     args=("${args[@]:0:$((${#args[@]}-1))}")
 

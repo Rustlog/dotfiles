@@ -246,7 +246,7 @@ function main() {
 
     local editor="" journal_dir="" journal_file=""
     journal_dir="${HOME}/journalDir"
-    journal_file="${journal_dir}/logs/$(date +%d-%b-%Y_).md"
+    journal_file="${journal_dir}/logs/$(date +%Y-%m-%d_).md"
 
     local -i edit_journal=0 edit_template=0
     local -i show_journal=0 show_template=0
@@ -254,10 +254,10 @@ function main() {
 
     local -g verbose=0
     local -g TEMPLATE_FILE="${journal_dir}/.template"
-    local -g TRANSFORM_KEY="${HOME}/.custom/${0##*/}/substitution_cipher"
+    local -g TRANSFORM_KEY="${HOME}/.config/custom/${0##*/}/substitution_cipher"
     local -g TEMP_FILE=""
 
-    mkdir -p "${TRANSFORM_KEY%%/"${TRANSFORM_KEY##*/}"}"
+    mkdir -p "${TRANSFORM_KEY%/*}"
 
     [[ ! -s "${TRANSFORM_KEY}" ]] && CreateNewKey
 

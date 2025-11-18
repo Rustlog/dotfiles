@@ -76,24 +76,6 @@ function Export_vars() {
     export LESSCHARSET=utf-8
 }
 
-function SetLocale() {
-    local locale="${1:-"en_US.UTF-8"}"
-    LC_ALL="${locale}"
-    LC_CTYPE="${locale}"
-    LC_NUMERIC="${locale}"
-    LC_TIME="${locale}"
-    LC_COLLATE="${locale}"
-    LC_MONETARY="${locale}"
-    LC_MESSAGES="${locale}"
-    LC_PAPER="${locale}"
-    LC_NAME="${locale}"
-    LC_ADDRESS="${locale}"
-    LC_TELEPHONE="${locale}"
-    LC_MEASUREMENT="${locale}"
-    LC_IDENTIFICATION="${locale}"
-    LANG="${locale}"
-}
-
 function Alias_vars() {
     # Ls/Directory listing commands alias
     alias LS="eza --color=always --icons=always --octal-permissions --binary --across"
@@ -108,7 +90,6 @@ function Alias_vars() {
 
     # File operations alias
     alias mv="mv --verbose"
-    alias Cat="/usr/bin/bat --theme-dark=TwoDark --color=always --paging=always --decorations=never"
 
     # Navigation/cd aliases
     _CD_DIRS="mkdir -p \${dir} && cd \${dir}; unset dir"
@@ -160,6 +141,7 @@ function Alias_vars() {
     alias qutebrowser="QT_QPA_PLATFORM=xcb QT_WEBENGINE_DISABLE_GPU=1 qutebrowser"
     alias colorchoser="env QT_QPA_PLATFORMTHEME=qt6ct kcolorchooser 2> /dev/null & disown"
     alias getcolors="env QT_QPA_PLATFORMTHEME=qt6ct kcolorchooser 2> /dev/null & disown"
+    alias ffmpeg="ffmpeg -hide_banner"
 
     # Metadata/file info aliases
     alias exiftool="/usr/bin/vendor_perl/exiftool"
@@ -233,7 +215,7 @@ function RequiredTools() {
     local -a TOOL_ARR=()
     TOOL_ARR=(
         # Shells
-        zsh fish
+        zsh bash dash
         # Editors
         nvim vim micro nano
         # Version control
@@ -779,7 +761,7 @@ function gpt() {
 }; alias devgpt='gpt dev'; alias gptimg='gpt img'
 
 ### Pretty `cat` like command with colors
-function catbat() {
+function CatBat() {
     local -a args=("$@")
     local -a batargs=()
     for arg in "${args[@]}"; do
@@ -793,7 +775,7 @@ function catbat() {
         esac
     done
     /usr/bin/bat --theme-dark=TwoDark --color=always --decorations=never --paging=never "${batargs[@]}"
-}; alias Cat="catbat"
+}
 
 ### Pretty `less` like command with colors
 function Less() {
@@ -846,6 +828,33 @@ function Spanish() {
 
 }
 
+# Set existing locale
+function SetLocale() {
+    local locale="${1:-"en_US.UTF-8"}"
+    export LC_ALL="${locale}"
+    export LC_CTYPE="${locale}"
+    export LC_NUMERIC="${locale}"
+    export LC_TIME="${locale}"
+    export LC_COLLATE="${locale}"
+    export LC_MONETARY="${locale}"
+    export LC_MESSAGES="${locale}"
+    export LC_PAPER="${locale}"
+    export LC_NAME="${locale}"
+    export LC_ADDRESS="${locale}"
+    export LC_TELEPHONE="${locale}"
+    export LC_MEASUREMENT="${locale}"
+    export LC_IDENTIFICATION="${locale}"
+    export LANG="${locale}"
+}
+
+# Generate locale
+function LocaleGen() {
+    local locale_name="${1}"
+    IFS='.' lang enc <<< "${locale_name}"
+    sudo localedef -i "${lang}" -f "${enc}"
+    SetLocale "${locale_name}"
+}
+
 ### Grammer checker
 function grammer_check() {
     [[ -n $ZSH_VERSION ]] && emulate -LR bash
@@ -853,9 +862,9 @@ function grammer_check() {
     local raw_text
 
     if [[ -f "${arg}" ]]; then
-        raw_text=$(<"$file")
+        raw_text=$(<"${file}")
     else
-        raw_text="$*"
+        raw_text="${*}"
     fi
     # Read and sanitize input
 
@@ -899,7 +908,7 @@ function grammer_check() {
 }
 
 # sysstat: lightweight stats (net + disk)
-sysstat() {
+function sysstat() {
     local iface="${1:-$(ip route | grep default | awk '{print $5}')}"
     local dev="${2:-nvme0n1}"
     local interval="${3:-1}"
@@ -1124,6 +1133,28 @@ function pscpu() {
     ps --sort="-%cpu" "${cmd_args[@]}" -o'user,group,%mem,%cpu,command' | less -c -
 }
 
+function available_mem() {
+    Mib=$(awk '
+        /MemFree:/            { free      += $4 }
+        /Active\(file\): /    { act_file  += $4 }
+        /Inactive\(file\): /  { inact_file+= $4 }
+        /SReclaimable:/       { reclaim   += $4 }
+        /Shmem:/              { shmem     += $4 }
+        END {
+            total = free + act_file + inact_file + reclaim
+            deduction = shmem
+            reclaimable_file = act_file + inact_file + reclaim
+            if (deduction > 0.5 * reclaimable_file)
+                deduction = 0.5 * reclaimable_file
+                available_kib = total - deduction
+                printf "%.0f", available_kib / 1024
+            }
+    ' /sys/devices/system/node/node*/meminfo)
+
+    printf "Available RAM: %s MiB\n" "${Mib}"
+
+}
+
 function brightness() {
     local -i desired_brightness=$1
     local -i max_brightness=$(cat /sys/class/backlight/*/max_brightness)
@@ -1141,6 +1172,11 @@ function brightness() {
 function Yt-dlp_download() {
     local url="$@"
     yt-dlp -f "bestvideo[height<=1080][ext=webm]/bestvideo[height<=1080]+bestaudio" "${url[@]}"
+}
+
+function GDB() {
+    local -a args=("${@}")
+    /usr/bin/env gdb -ex 'break main' -ex 'run' -ex 'lay split' "${args[@]}"
 }
 
 ### Get Ip and location info for current Network
@@ -1186,7 +1222,6 @@ function Sort() {
 
 # Random MAC address
 function gen_mac() {
-
     if command -v od &> /dev/null; then # od from coreutils
         [[ -n $BASH_VERSION ]] && flag="-a"
         [[ -n $ZSH_VERSION ]] && flag="-A"
@@ -1205,6 +1240,7 @@ function gen_mac() {
     fi
 }
 
+# Print specific line from a file
 function print_line() {
     local line="${1:-1}"
     local file="${2:-""}"
@@ -1284,11 +1320,11 @@ function ToggleDrivers() {
     local -a args=("$@")
 
     toggle_driver_() {
-        local module="$1"
-        local device="$2"
+        local module="${1}"
+        local device="${2}"
         [[ $# -ne 2 ]] && return 1
-        if lsmod | /usr/bin/grep -q "^${module}"; then
-            sudo modprobe -r "${module}" && log info "Disabled ${device}"
+        if lsmod | /usr/bin/grep "^${module}" &> /dev/null; then
+            sudo rmmod -f "${module}" && log info "Disabled ${device}"
         else
             sudo modprobe "${module}" && log info "Enabled ${device}"
         fi
@@ -1414,9 +1450,14 @@ function TarPlay() {
 function sway_vulkan() {
     local -i num_=${1:-0}
     local logfile="/tmp/sway.log"
-    if ! dbus-run-session "$(find ~/.bin/ -type f -name Sway)" ${num_} &>> "${logfile}"; then
+    if ! "$(find ~/.bin/ -type f -name Sway)" ${num_} &>> "${logfile}"; then
         less -c "${logfile}"
     fi
+}
+
+function Cat() {
+    local -a args=("${@}")
+    bat --theme-dark=TwoDark --color=always --paging=never --decorations=never "${args[@]}" | less -c -
 }
 
 function notify() {

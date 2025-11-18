@@ -21,11 +21,11 @@ function Decrypt() {
 }
 
 function main() {
-    local key_file="${HOME}/.custom/${0##*/}/${0##*/}"
+    local key_file="${HOME}/.config/custom/${0##*/}/config"
     local -a files=()
     local -a editor_args=()
 
-    mkdir -p "${key_file%%/${key_file##*/}}"
+    mkdir -p "${key_file%/*}"
 
     if [[ ! -s "${key_file}" || ! -f "${key_file}" ]]; then
         keygen "${key_file}" && printf '%s\n' "New key saved to '${key_file}'"

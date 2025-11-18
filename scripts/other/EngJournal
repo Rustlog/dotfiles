@@ -18,18 +18,18 @@ function LOG() {
 }
 
 function Usage() {
-    printf "%s\n" "Usage: $(basename "$0") edit|delete N"
+    printf "%s\n" "Usage: ${0##*/} edit|delete N"
 }
 
 function CreateDirectory() {
-    mkdir --parents "${LESSON_DIRECTORY}" && \
+    mkdir -p "${LESSON_DIRECTORY}" && \
         LOG info "Directory created: ${LESSON_DIRECTORY}"
 }
 
 function CreateFile() {
     local File="$1"
     local Prompt=
-    mkdir --parents $(dirname ${PROMPT_HISTORY})
+    mkdir -p "${PROMPT_HISTORY%/*}"
     touch "${PROMPT_HISTORY}"
     # Loop to get unique prompt
     LOG info "Generating the prompt for you"
