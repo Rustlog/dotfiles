@@ -281,7 +281,7 @@
         "tooltip": false,
         "menu": "on-click",
         "on-click-right": "swaymsg reload",
-        "menu-file": "~/.config/waybar/scripts/power_menu.xml", // Menu file in resources folder
+        "menu-file": "~/.config/sway/scripts/power_menu.xml",
         "menu-actions": {
             "shutdown": "systemctl poweroff --now || loginctl poweroff",
             "reboot": "systemctl reboot --now || loginctl reboot",

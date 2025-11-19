@@ -109,14 +109,12 @@ bar {
 
 ### Auto Start ###
 
-    # pipewire
-    exec pipewire
     # Notification deamon
     exec mako
     # Polkit agent for authorization
-    exec /usr/lib/polkit-kde-authentication-agent-1
+    exec /usr/lib*/polkit-kde*
     # Start waybar
-    exec sleep 0.2 && bash ~/.config/sway/scripts/WaybarThemes 1
+    exec ~/.config/sway/scripts/WaybarThemes 1
     # Autotiling
     exec autotiling
     # Playerctl daemon
