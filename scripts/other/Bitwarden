@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-flags="$@"
+FLAGS=("${@}")
 SESSION_FILE="/tmp/.BW_SESSION"
 SECRET_FILE="$(mktemp -t FILE.XXXXXX)"
 
 function Help() {
     echo -e " A wrapper around Bitwarden cli"
-    echo -e "  Usage: $(basename $0) unlock|list"
+    echo -e "  Usage: ${0##*/} unlock|list"
 }
 
 function Unlock() {
@@ -18,7 +18,7 @@ function List() {
     if [[ ! -s "${SESSION_FILE}" ]]; then
         Unlock
     else
-        bw list items --session $(cat "${SESSION_FILE}") | \
+        bw list items --session "$(cat "${SESSION_FILE}")" | \
             jq '.[] | {name: .name, id: .id, username: .login.username, password: .login.password}' > "${SECRET_FILE}"
         echo -e "\n\n # vim:filetype=json5" >> "${SECRET_FILE}"
         vim "${SECRET_FILE}"
@@ -26,7 +26,7 @@ function List() {
     fi
 }
 
-for flag in $flags; do
+for flag in "${FLAGS[@]}"; do
     case "${flag}" in
         unlock)
             Unlock

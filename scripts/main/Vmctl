@@ -41,7 +41,7 @@ function Usage() {
         "-f, fullscreen"    "Enable fullscreen mode" \
         "-e, edit"          "Edit the profiles config file"
 
-    printf "\n${HL}Other flags:${NC}\n"
+    printf '%b\n' "\n${HL}Other flags:${NC}\n"
     printf "  ${MSG_COL}%-18b${NC} %b\n" \
         "create-image"      "Create new disk image" \
         "format"            "Specify the disk format when creating a new image" \
@@ -50,7 +50,7 @@ function Usage() {
         "comment"           "Provide a comment when creating a new profile" \
         "-h, help"          "Show this help message"
 
-    printf "\n${HL}Examples:${NC}\n"
+    printf '%b\n' "\n${HL}Examples:${NC}\n"
     printf "  %s\n     ${HL}%b${NC}\n" \
         "Start with disk only"          "${script_basename} my_profile" \
         "Boot with Disk + ISO"          "${script_basename} boot my_profile" \
@@ -60,10 +60,10 @@ function Usage() {
 }
 
 function load_profile() {
-    local profile_name="$1"
-    local -n disk_img_=$2
-    local -n iso_img_=$3
-    local -n disk_format_=$4
+    local profile_name="${1}"
+    local -n disk_img_=${2}
+    local -n iso_img_=${3}
+    local -n disk_format_=${4}
     local -n selected_profile=${profile_name}
 
     if ! declare -p "${profile_name}" 2> /dev/null | grep -q 'declare -a' ; then
@@ -73,14 +73,12 @@ function load_profile() {
 
     for n in "${selected_profile[@]}"; do
         [[ "${n}" != *=* ]] && { log error "invalid pair '${n}'"; return 1; }
-        IFS=$'=' read -r key value "${n}"
+        IFS=$'=' read -r key value <<< "${n}"
         case "${key}" in
-            img) disk_img_+=("${value}") ;;
+            img) disk_img_="${value}" ;;
             iso) iso_img_="${value}" ;;
         esac
     done
-    disk_img_="${selected_profile[0]}"
-    iso_img_="${selected_profile[1]:="No_ISO"}"
     disk_format_="${disk_img_##*.}"
 }
 
@@ -97,7 +95,7 @@ function ListProfiles() {
     local config_file="$1"
     local -a available_profiles=""
     [[ -f "${config_file}" ]] || return 1
-    log info "Available profiles in $(ColorPath "${config_dir}"):"
+    log info "Available profiles in $(ColorPath "${CONFIG_DIR}"):"
     mapfile -t available_profiles < <(grep -o '^[A-Za-z_]*=(' "${config_file}" | sed 's/=(//')
     for (( i=0; i < ${#available_profiles[@]}; i++ )); do
         printf '   %s. %b\n' "$((i+1))" "${available_profiles[$i]}"
@@ -105,11 +103,11 @@ function ListProfiles() {
 }
 
 function CreateDiskImg() {
-    local img="$1"
-    local format="$2"
-    local size="$3"
+    local img="${1}"
+    local format="${2}"
+    local size="${3}"
     [[ "${img}" == *.* ]] || img="${img}.${format}"
-    qemu-img create -f ${format:-"raw"} "${img}" "${size:-"20G"}"
+    qemu-img create -f "${format:-"raw"}" "${img}" "${size:-"20G"}"
     log info "Disk created:"
     printf '    %s %-4s = %s\n' \
         "Disk image:  "  ""  "${img}" \
@@ -176,8 +174,8 @@ function boot_VM() {
         "-display" "gtk,gl=on,show-menubar=off,zoom-to-fit=on"
         "-boot" "d"
         "-enable-kvm"
-        "-drive" "file="${disk_img// /\\}",media=disk,format="${format}",if=virtio"
-        "-drive" "file="${iso// /\\}",media=cdrom"
+        "-drive" "file=${disk_img// /\\},media=disk,format=${format},if=virtio"
+        "-drive" "file=${iso// /\\},media=cdrom"
     )
 
     [[ $full_scr -eq 1 ]] && qemu_flags_arr+=( "-full-screen" )
@@ -234,86 +232,109 @@ function start_VM() {
     qemu-system-x86_64 "${qemu_flags_arr[@]}" & disown
 }
 
+# Helper functions
+
+function set_value() {
+    local -n var_ref=${1}
+    local -n value_ref=${2}
+    [[ -n "${value_ref}" ]] || { log error "'${var_ref}' requires a value"; return 1; }
+    var_ref="${value_ref}"
+}
+
+function set_profile() {
+    local -n var_ref=${1}
+    local -n value_ref=${2}
+    [[ -n "${value_ref}" ]] || { log error "'${var_ref}' requires a value"; return 1; }
+    var_ref+=("${value_ref}")
+}
+
+
+function resolve_path() {
+    local file="${1}" profile="${2}"
+    if [[ "${file}" == */* ]]; then
+        printf '%s\n' "${file}"
+    else
+        printf '%s\n' "${CONFIG_DIR}/${profile}/${file}"
+    fi
+}
+
+function require() {
+    local var="${1:-""}" _type="${2:-""}" msg="${3:-""}"
+    [[ -n "${var}" ]] && return 0
+    if [[ -n "${msg}" ]]; then
+        log "${_type}" "${msg}"; return 1
+    else
+        return 1
+    fi
+}
+
+function require_file() {
+    local file="${1}" msg="${2}"
+    [[ -f "${file}" ]] || \
+        { log error "${msg}"; return 1; }
+}
+
 function main() {
-    # Flags
-    local -a arg_array=("$@")
+    local -a args=("$@")
 
     local disk_img="" iso_img="" disk_format=""
+    local -g CONFIG_DIR="${HOME}/.config/custom/vmctl"
+    local -a profile_names=()
     local -a requested_profiles=()
-    local -g config_dir="${HOME}/.config/custom/vmctl"
-    local config_file="${config_dir}/profiles" profile_name=""
-    local comment="" create_img=""
+    local config_file="${CONFIG_DIR}/profiles"
+    local comment="" new_image_path=""
 
     local -i boot=0 full_scr=0
     local -i ram="$(( $(awk '/MemTotal/ { print $2 }' /proc/meminfo) / 1640 ))"
     local -i should_create_profile=0 should_create_img=0
     local disk_size=""
 
-    [[ ${#arg_array[@]} -eq 0 ]] && {
+    [[ ${#args[@]} -eq 0 ]] && {
         Usage "${config_file}"
         return 0
     }
 
-    mkdir -p "${config_dir}"
+    mkdir -p "${CONFIG_DIR}"
 
-    if [[ -s "${config_file}" && -f "${config_file}" ]]; then
-        source "${config_file}"
-    else
-        log warn "No profile found. Creating a default"
-        if WriteProfile "${config_file}"; then
-            log info "New default profile created at '$(ColorPath "${config_file}")'"
-        fi
+    if ! require_file "${config_file}" "Config '${config_file}' not found"; then
+        WriteProfile "${config_file}"
     fi
 
-    set_value() {
-        local -n var_ref=${1}
-        local -n value_ref=${2}
-        [[ -n "${value_ref}" ]] || { log error "'${var_ref}' requires a value"; return 1; }
-        var_ref="${value_ref}"
-    }
+    # shellcheck disable=SC1090
+    source "${config_file}"
 
     # Parse args
-    for arg in "${arg_array[@]}"; do
+    local arg="" value=""
+    for ((i=0;i<${#args[@]};i++)); do
+        arg="${args[$i]}"
+        [[ "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
+            value="${args[$((i+1))]:-""}" i=$((i+1))
         if [[ "${arg}" == *=* ]]; then
             IFS=$'=' read -r arg value <<< "${arg}"
-            [[ -n "${value}" ]] || { log error "'${arg}' requires a value"; return 1; }
+            [[ -n "${value}" ]] || \
+                { log error "'${arg}' requires a value"; return 1; }
         fi
+        [[ "${arg}" == --* ]] && arg="${arg//--/-}"
         case "${arg}" in
-            boot|-*boot) boot=1 ;;
-            image|-*image) set_value disk_img value ;;
-            iso|-*iso) set_value iso_img value ;;
-            ram|-*ram) set_value ram value ;;
-            comm*) set_value comment value ;;
-            for*) set_value disk_format value ;;
-            pro*|-*pro*) set_value profile_name value ;;
-            -f|-*full*|*full*) full_scr=1 ;;
-            -*l|list*|-*list*) ListProfiles "${config_file}" return 0 ;;
-            edit|-*edit) EditConfigFile "${config_file}" return 0 ;;
-            h|-h|-*help|help) Usage "${config_file}" return 0 ;;
-            create*im*|-*create*im*)
-                IFS=$',' read -r create_img disk_format disk_size <<< "${value}"
-
-                # Image file
-                [[ -n "${create_img}" ]] && should_create_img=1 || { log fatal "No image specified"; return 1; }
-
-                # Disk format
-                case "${disk_format}" in
-                    raw|qcow2) set_value disk_format value ;;
-                    *) log error "Unknown format" ;;
-                esac
-
-                if [[ -z "${disk_format}" ]]; then disk_format="${create_img##*.}"
-                else disk_format="${disk_format}"
-                fi
-
-                # Disk size
-                if [[ "${disk_size}" =~ ^[0-8]+(K|M|G)$ ]]; then
-                    disk_size="${disk_size}"
-                fi
+            -b|-boot)           boot=1                                      ;;
+            -f|-full*)          full_scr=1                                  ;;
+            -image|-*image)     set_value disk_img value                    ;;
+            -iso|-*iso)         set_value iso_img value                     ;;
+            -ram|-*ram)         set_value ram value                         ;;
+            -comm*)             set_value comment value                     ;;
+            -for*)              set_value disk_format value                 ;;
+            -p|-profile*)       set_profile profile_names value              ;;
+            -l|-list*)          ListProfiles "${config_file}"; return 0     ;;
+            -e|-edit*)          EditConfigFile "${config_file}"; return 0   ;;
+            -h|-help)           Usage "${config_file}"; return 0            ;;
+            -create*ima*)
+                IFS=$',' read -r new_image_path disk_format disk_size <<< "${value}"
+                require "${new_image_path}" error "No image specified" && should_new_image_path=1
+                require "${disk_format}" "" "" || disk_format="${new_image_path##*.}"
+                [[ "${disk_size}" =~ ^[0-8]+(K|M|G)$ ]] || { log error "size not in K|M|G suffix"; return 1; }
                 ;;
-            new*pro*|create*pro*|pro*|-*create*pro*|-*new*pro*)
-                set_value profile_name value
-                [[ -z "${profile_name}" ]] && log fatal "No profile specified"
+            -create*pro*|-new*pro*)
+                set_profile profile_names value
                 should_create_profile=1
                 ;;
             [A-Za-z_]*)
@@ -331,85 +352,82 @@ function main() {
         esac
     done
 
-    if [[ -n "${profile_name}" ]]; then
-        requested_profiles+=("${profile_name}")
+    if [[ ${#profile_names[@]} -eq 0 ]]; then
+        log error "No profile given"
+        return 1
     fi
 
-    if [[ $should_create_img -eq 1 ]]; then
-        [[ -z "${profile_name}" ]] && log fatal "No profile name specified"
-        [[ -z "${create_img}" ]] && log fatal "No disk image specified"
-        [[ -z "${disk_format}" ]] &&  log fatal "No disk format specified"
-        [[ -z "${disk_size}" || "${disk_size}" == "0" ]] && log fatal "No image size specified"
-        mkdir -p "${config_dir}/${profile_name}"
-        CreateDiskImg "${config_dir}/${profile_name}/${create_img}" "${disk_format}" "${disk_size}"
-        return 0
-    fi
-
-    if [[ $should_create_profile -eq 1 ]]; then
-        local temp_iso_img="" temp_create_img=""
-        if [[ -z "${iso_img}" ]]; then
-            log warn "No ISO image is given"
-            temp_iso_img=""
-        elif [[ "${iso_img}" != */* ]]; then
-            temp_iso_img="${config_dir}/${profile_name}/${iso_img}"
-        else
-            temp_iso_img="${iso_img}"
-        fi
-
-        if [[ -z "${disk_img}" ]]; then
-            log fatal "No disk image is given"
-        elif [[ "${disk_img}" != */* ]]; then
-            temp_iso_img="${config_dir}/${profile_name}/${disk_img}"
-        else
-            temp_iso_img="${iso_img}"
-        fi
-
-        if [[ "${config_dir}/${profile_name}/${create_img}" ]]; then
-            temp_create_img="${config_dir}/${profile_name}/${create_img}"
-        fi
-
-        WriteProfile "${config_file}" "${profile_name}" "${disk_img:-"${temp_create_img}"}" "${iso_img:-"${temp_iso_img}"}" "${comment}" || \
-            log warn "'${profile_name}' already exists"
-        [[ $? -eq 0 ]] && return 0 || return 1
-    fi
-
-    if [[ ${#requested_profiles[@]} -eq 0 ]]; then
-        [[ -n "${profile_name}" ]] || log fatal "No profile name was given"
-    fi
-
-    source "${config_file}"
+    for profile in "${profile_names[@]}"; do
+        IFS=',' read -r -a parts <<< "${profile}"
+        requested_profiles+=("${parts[@]}")
+    done
 
     for req_profile in "${requested_profiles[@]}"; do
 
-        [[ -z "${disk_format}" ]] && disk_format="${iso_img#*.}"
+        new_image_path="$(resolve_path "${new_image_path}" "${req_profile}")"
 
-        [[ -n ${iso_img} ]] && boot=1
-
-        if [[ -z "${disk_img}" || -z "${iso_img}" || -z "${disk_format}" ]]; then
-            load_profile "${req_profile}" disk_img iso_img disk_format
+        if [[ $should_create_img -eq 1 ]]; then
+            require "${req_profile}" fatal "No profile name specified"
+            require "${new_image_path}" fatal "No disk image specified"
+            require "${disk_format}" fatal "No disk format specified"
+            require "${disk_size}" fatal "No image size specified"
+            [[ "${disk_size}" == "0" ]] && log fatal "Invalid disk size"
+            mkdir -p "${CONFIG_DIR}/${req_profile}"
+            CreateDiskImg "${new_image_path}" "${disk_format}" "${disk_size}"
+            return 0
         fi
 
-        # Path checks for disk image
-        if [[ -z "${disk_img}" ]]; then
-            log fatal "No disk image given"
-        elif [[ ! -s "${disk_img}" || ! -f "${disk_img}" ]]; then
-            log fatal "Disk image '${BLUE}${disk_img}${NC}' does not exist; Update it\n"
+        if [[ $should_create_profile -eq 1 ]]; then
+            local temp_iso_img="" temp_create_img=""
+            require "${iso_img}" warn "No ISO image is given"
+            temp_iso_img="$(resolve_path "${iso_img}" "${req_profile}")"
+            require "${disk_img}" fatal "No disk image is given"
+            temp_iso_img="$(resolve_path "${disk_img}" "${req_profile}")"
+
+            WriteProfile \
+                "${config_file}" \
+                "${req_profile}" \
+                "${disk_img:-"${temp_create_img}"}" \
+                "${iso_img:-"${temp_iso_img}"}" \
+                "${comment}" || \
+                log warn "'${req_profile}' already exists"
+            return 0
         fi
 
+        if [[ ${#requested_profiles[@]} -eq 0 ]]; then
+            require "${req_profile}" fatal "No profile name was given"
+        fi
+
+        # shellcheck disable=SC1090
+        source "${config_file}"
+
+        load_profile "${req_profile}" disk_img iso_img disk_format
+
+        require "${disk_format}" "" "" || disk_format="${iso_img#*.}"
+        require "${disk_format}" error "Disk format not set"
+
+        require "${disk_img}" error "Disk image not set"
+        require_file "${disk_img}" error "Disk image path '${BLUE}${disk_img}${NC}' is invalid"
+
+        [[ $boot -eq 1 ]] && require "${iso_img}" error "Disk image not set"
+        [[ $boot -eq 1 ]] && require_file "${iso_img}" error "No ISO image given"
+
+        # Launch VM
         if [[ $boot -eq 1 ]]; then
-            # Path checks for iso image
-            if [[ -z "${iso_img}" ]]; then
-                log fatal "No ISO image given"
-            elif [[ ! -s "${iso_img}" || ! -f "${iso_img}" ]]; then
-                log fatal "ISO '${BLUE}${iso_img}${NC}' does not exist"
-            fi
-        fi
-
-        # Entry logic
-        if [[ $boot -eq 1 ]]; then
-            boot_VM "${disk_img}" "${iso_img}" "${disk_format}" $ram $full_scr "${req_profile}"
+            boot_VM \
+                "${disk_img}" \
+                "${iso_img}" \
+                "${disk_format}" \
+                $ram \
+                $full_scr \
+                "${req_profile}"
         else
-            start_VM "${disk_img}" "${disk_format}" $ram $full_scr "${req_profile}"
+            start_VM \
+                "${disk_img}" \
+                "${disk_format}" \
+                $ram \
+                $full_scr \
+                "${req_profile}"
         fi
     done
 }

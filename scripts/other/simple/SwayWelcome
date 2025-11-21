@@ -6,7 +6,7 @@ function main() {
     local padding=20
     local alignment=5
 
-    printf "%-${padding}s" ""; for i in {1..82}; do printf "$"; done; printf "\n"
+    printf "%-${padding}s" ""; for ((i=0;i<82;i++)); do printf '%s' "$"; done; printf "\n"
 
     printf "%-${padding}s$%-${alignment}b${green}%b${nc}%-${alignment}b$\n" \
     "" "" "                                                                      " "" \
@@ -44,7 +44,8 @@ function main() {
     "" "" "                                                                      " "" \
     "" "" "                                                                      " ""
 
-    printf "%-${padding}s" ""; for i in {1..82}; do printf "$" ""; done; printf "\n"
+    printf "%-${padding}s" ""; for i in {1..82}; do printf '%s' "$"; done; printf "\n"
 }
 
-main
+main "${@}"
+

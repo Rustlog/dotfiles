@@ -6,12 +6,12 @@ MSG_COL="\033[38;2;255;255;200m"
 
 # Print a formatted header
 function HEADER() {
-    printf "${HL}${MSG_COL}%s${NC}\n" "$1"
+    printf "${HL}${MSG_COL}%s${NC}\n" "${1}"
 }
 
 # Print a labeled info row
 function INFO() {
-    printf "  ${MSG_COL}%-30s${NC}: %s\n" "$1" "$2"
+    printf "  ${MSG_COL}%-30s${NC}: %s\n" "${1}" "${2}"
 }
 
 sudo -v # ask for sudo up front
@@ -19,7 +19,7 @@ sudo -v # ask for sudo up front
 HEADER "System"
 INFO "Hostname" "$(cat /etc/hostname)"
 INFO "Kernel Version" "$(uname -r)"
-INFO "OS" "$(source /etc/os-release && echo $PRETTY_NAME)"
+INFO "OS" "$(source /etc/*release && echo "$PRETTY_NAME")"
 INFO "Architecture" "$(uname -m)"
 INFO "Uptime" "$(uptime -p)"
 
@@ -48,7 +48,7 @@ INFO "Total Swap" "$TOTAL_SWAP"
 
 HEADER "Environment"
 INFO "Shell" "$SHELL"
-INFO "Desktop Environment" "${XDG_CURRENT_DESKTOP:-$DESKTOP_SESSION}"
+INFO "DE/WM" "${XDG_CURRENT_DESKTOP:-$DESKTOP_SESSION}"
 INFO "Display Resolution" "$(xrandr | grep '*' | awk '{print $1}' | head -n1)"
 
 HEADER "Network"

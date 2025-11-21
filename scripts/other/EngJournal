@@ -33,7 +33,7 @@ function CreateFile() {
     touch "${PROMPT_HISTORY}"
     # Loop to get unique prompt
     LOG info "Generating the prompt for you"
-    for i in {1..10}; do
+    for ((i=0;i<10;i++)); do
         Prompt=$(tgpt --quiet "Give me one short writing prompt to improve my English writing fluency, 1–2 sentences. No explanation. No intro. Only the prompt. Seed: $RANDOM")
         # Strip weird chars just in case
         Prompt=$(echo "${Prompt}" | tr -cd '[:print:]\n')
@@ -107,7 +107,8 @@ function main() {
     fi
 
     if [[ $edit_file -eq 1 ]]; then
-        [[ -f "${FILE}" ]] && EditFile "${FILE}" || LOG error "File '${FILE}' does not exist"
+        [[ ! -f "${FILE}" ]] && LOG error "File '${FILE}' does not exist"
+        EditFile "${FILE}"
     fi
 }
 

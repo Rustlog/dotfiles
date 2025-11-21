@@ -54,9 +54,9 @@ function CreateConfig() {
 
 GIT_DIR="\${HOME}/repos/Dotfiles"
 
-# Your GitHub username
-USERNAME=""
-# Your GitHub repository
+# Your Remote username
+REMOTE_USERNAME=""
+# Your Remote repository name
 REPO_NAME=""
 
 CONF_DIR="\${HOME}/.config"
@@ -74,9 +74,10 @@ COPY_FILES=(
 
 ### Copy directory to destination (repo) dir
 COPY_DIRS=(
+    #    src   |    dest   | [1|0] (1 = delete files from dest if not in src, 0 = do nothing)
     "\${H}/.bin|\${GIT_DIR}/scripts|1"
-    "\${C}/hypr|\${GIT_DIR}/hyprland|1"
     "\${C}/sway|\${GIT_DIR}/sway|1"
+    "\${C}/hypr|\${GIT_DIR}/hyprland|1"
     "\${C}/i3|\${GIT_DIR}/i3|1"
     "\${C}/waybar|\${GIT_DIR}/waybar|1"
     "\${C}/wofi|\${GIT_DIR}/wofi|1"
@@ -90,9 +91,10 @@ COPY_DIRS=(
 
 EOF
     then
-        log info "Created: '$(ColorPath "${config_file}")'"
+        log info "New configuration generated (with defaults): '$(ColorPath "${config_file}")'"
+        log info "Edit it accordingly, To edit configuration use '${0##*/} --edit'"
     else
-        log error "Error creating '$(ColorPath "${config_file}")'"
+        log error "Error creating configuration: '$(ColorPath "${config_file}")'"
         return 1
     fi
     return 0
@@ -100,7 +102,7 @@ EOF
 
 function ValidatePaths() {
     local -n indexed_array=${1}
-    local valid=0
+    local -i valid=0
     for pair in "${indexed_array[@]}"; do
         IFS=$'|' read -r src dest <<< "${pair}"
         if [[ ! -e "${src}" ]]; then
@@ -113,31 +115,32 @@ function ValidatePaths() {
 
 function ValidateDirPaths() {
     local -n indexed_array=${1}
-    local valid=0
+    local -i is_valid=0
     for pair in "${indexed_array[@]}"; do
         IFS=$'|' read -r src dest recursive_flag <<< "${pair}"
         if [[ ! -e "${src}" ]]; then
             log error "Invalid directory path: ${src}"
-            valid=1
-        elif [[ -z $recursive_flag ]]; then
+            is_valid=$((is_valid+1))
+        fi
+        if [[ -z "${dest}" ]]; then
+            log error "dest cannot be empty: ${src}"
+            is_valid=$((is_valid+1))
+        fi
+        if [[ -z $recursive_flag ]]; then
             log error "Recursive flag not given to '$(ColorPath "${pair}")'"
-            valid=1
+            is_valid=$((is_valid+1))
         fi
     done
-    return $valid
+    return $is_valid
 }
 
 function SourceConfig() {
     local config_file="$1"
-    if [[ -s "${config_file}" && -f "${config_file}" ]]; then
-        # shellcheck source=/dev/null
-        source "${config_file}" || log error "Failed to source '${config_file}'"
-    else
-        log error "'$(ColorPath "${config_file}")' not found"
+    if [[ ! -s "${config_file}" || ! -f "${config_file}" ]]; then
         CreateConfig "${config_file}"
-        source "${config_file}" || log error "Failed to source '${config_file}'"
     fi
-    return 0
+    # shellcheck source=/dev/null
+    source "${config_file}" || { log error "Failed to source '${config_file}'"; return 1; }
 }
 
 function EditConfig() {
@@ -227,7 +230,7 @@ function CopyDirs() {
 function CloneRepo() {
     local DIR="$1"
 
-    [[ -z "${USERNAME}" && -z "${REPO_NAME}" ]] && {
+    [[ -z "${REMOTE_USERNAME}" && -z "${REPO_NAME}" ]] && {
         log error "No github username or repo name is given"
         exit 1
     }
@@ -241,15 +244,12 @@ function CloneRepo() {
 
     log debug "Getting dotfile repo from github"
     log info "Cloning your repository at: $DIR"
-    git clone "https://github.com/${USERNAME}/${REPO_NAME}.git" "${DIR}" && \
+    git clone "https://github.com/${REMOTE_USERNAME}/${REPO_NAME}.git" "${DIR}" && \
         log info "Repository clone at '${BLUE}$(ColorPath "${DIR}")${NC}'"
 }
 
 function PushToRepo() {
-    local force="$1"
-    local satisfied=""
-    local should_continue=""
-    local should_commit=""
+    local force_push=${1}
     local commit_template_file=""
 
     for file in ~/.git_commit_template_file ~/.gitmessage ~/.git_template; do
@@ -258,8 +258,8 @@ function PushToRepo() {
 
     [[ -z "${commit_template_file}" ]] && commit_template_file=<( printf "[tag] module: what changed\n\n" )
 
-    if [[ -z "${USERNAME}" ]]; then
-        log error "'USERNAME' is empty update your '$(ColorPath "${CONFIG_FILE}")'"
+    if [[ -z "${REMOTE_USERNAME}" ]]; then
+        log error "'REMOTE_USERNAME' is empty update your '$(ColorPath "${CONFIG_FILE}")'"
         return 1
     fi
     if [[ -z "${REPO_NAME}" ]]; then
@@ -279,26 +279,40 @@ function PushToRepo() {
     log info "Summary of staged changes"
     git diff --staged --stat
 
-    printf "%s: " "Are you saisfied with changes? (y|n)"; read -r satisfied
+    local is_satisfied=""
+    printf "%s: " "Are you saisfied with changes? (y|n)"; read -r is_satisfied
 
-    if [[ "${satisfied}" =~ ^(y|yes|Yes)$ ]]; then
+    if [[ "${is_satisfied}" =~ ^(y|yes|Yes)$ ]]; then
+        local should_commit=""
         printf "%s: " "Commit? (y|n)"; read -r should_commit
         [[ "${should_commit}" =~ ^(y|yes|Yes)$ ]] || return 1
         if git commit --template="${commit_template_file}"; then
             log info "Successfully commited the changes"
         else
              if ! git diff --quiet --staged && git diff --quiet --staged; then
-                 log error "Commit failed" && exit 1
+                 log error "Commit failed" && return 1
              fi
         fi
     else
         log info "Commit aborted"
+        local should_continue=""
         printf "%s: " "Continue to commit?"; read -r should_continue
-        [[ "${should_continue}" =~ ^(y|yes|Yes)$ ]] || exit 1
+        [[ "${should_continue}" =~ ^(y|yes|Yes)$ ]] || return 1
     fi
-    log info "Pushing changes to git@github.com:${USERNAME}/${REPO_NAME}.git"
-    git push "git@github.com:${USERNAME}/${REPO_NAME}.git" "$(git symbolic-ref --short HEAD)" "${force}" && \
-        log info "Successfully pushed your changes to github repository"
+
+    local -a git_flags=(
+        "git@github.com:${REMOTE_USERNAME}/${REPO_NAME}.git"
+        "$(git symbolic-ref --short HEAD)"
+    )
+
+    [[ $force_push -eq 1 ]] && git_flags+=( "--force" )
+
+    log info "Push (force) changes to git@github.com:${REMOTE_USERNAME}/${REPO_NAME}.git"
+    if git push "${git_flags[@]}"; then
+        log info "Successfully pushed your changes at 'git@github.com:${REMOTE_USERNAME}/${REPO_NAME}.git'"
+    else
+        log error "Failed to push your changes at 'git@github.com:${REMOTE_USERNAME}/${REPO_NAME}.git'"
+    fi
 }
 
 function Cleanup() {
@@ -310,7 +324,7 @@ function Usage() {
     "${HL}Sync and Backup dotfile${NC}" \
     "" \
     "Usage:" \
-    "  BackUp [options]" \
+    "  ${0##*/} [options]" \
     ""  \
     "Options:" \
     "  -h, --help            Show this help message and exit" \
@@ -321,110 +335,56 @@ function Usage() {
     "  -s, --show            Show the config file ($(ColorPath "${CONFIG_FILE}"))" \
     "  -g, --git-status      Show git status of your dotfile repo after backup" \
     "  -c DIR, --clone DIR   Clone your dotfile repo to specified DIR (local path)" \
-    "  -m MSG, --msg MSG     Commit message for git push" \
     "  -p, --push            Push changes to your remote GitHub repository" \
     "  --force               Force git push with --force flag" \
     ""  \
     "Description:" \
-    "  This script copies important config files and directories into a" \
+    "  This script copies important configuration files and directories into a" \
     "  local git repository (${BLUE}$(ColorPath "${GIT_DIR}")${NC}) for backup and version control." \
     "  Optionally can clone your dotfiles repo from remote, push changes, and see git status." \
     "" \
     "Your Remote repo info:" \
-    "  Username: ${BLUE}${USERNAME}${NC}" \
+    "  Username: ${BLUE}${REMOTE_USERNAME}${NC}" \
     "  Repository: ${BLUE}${REPO_NAME}${NC}"
 }
 
-trap Cleanup SIGINT SIGTERM
-
 function main() {
     # An array to hold all the given flags
-    local -a flagArr=("$@")
-
-    # Temporary variable
-    local -g MSG=""
+    local -a args=("$@")
 
     # 1 for git status 0 for no git status
     local git_status=0
 
-    # Toggle push or pull
+    # On off switches
     local -i should_push=0 should_clone=0
     local -i show_help=0 show_config=0
+    local -i force_push=0 should_edit_config=0
+
     # Clone directory
     local clone_dir=""
 
-    local force=""
-
-    for ((i=0;i<${#flagArr[@]};i++)); do
-        arg="${flagArr[$i]}"
+    local arg="" value=""
+    for ((i=0;i<${#args[@]};i++)); do
+        arg="${args[$i]}"
+        [[ "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
+            value="${args[$((i+1))]:-""}" i=$((i+1))
+        if [[ "${arg}" == *=* ]]; then
+            IFS=$'=' read -r arg value <<< "${arg}"
+            [[ -n "${value}" ]] || \
+                { log error "'${arg}' requires a value"; return 1; }
+        fi
+        [[ "${arg}" == --* ]] && arg="${arg//--/-}"
         case "${arg}" in
-            -v|-*verbose|-*progress|verbose)
-                LOG_LEVEL=1
-                log debug "Verbose is set"
-                ;;
-            -l=*|-*log*=*|log*=*)
-                LOG_LEVEL=${arg#*=}
-                if [[ -z ${LOG_LEVEL} || ${LOG_LEVEL} == -* ]] || [[ ! ${LOG_LEVEL} =~ ^[0-9]+$ ]]; then
-                    LOG_LEVEL=1
-                elif [[ $LOG_LEVEL -gt 3 ]]; then
-                    log debug "LOG_LEVEL has no effect over integer ${LOG_LEVEL}"
-                fi
-                [[ $LOG_LEVEL -ge 3 ]] && log debug "Debugging enabled"
-                ;;
-            -l|-*log*|log*)
-                LOG_LEVEL=${flagArr[$(( i + 1 ))]:-1}
-
-                if [[ -z ${LOG_LEVEL} || ${LOG_LEVEL} == -* ]]; then
-                    LOG_LEVEL=1
-                elif [[ $LOG_LEVEL -gt 3 ]]; then
-                    log debug "LOG_LEVEL has no effect over integer ${LOG_LEVEL}"
-                fi
-                [[ $LOG_LEVEL -ge 3 ]] && log debug "Debugging enabled"
-                i=$(( i + 1 ))
-                ;;
-            -d-*debug|debug)
-                LOG_LEVEL=2
-                log debug "Debugging enabled"
-                ;;
-            -g|-*gs|-*git*stat*|git*stat*)
-                git_status=1
-                log debug "git_status is set"
-                ;;
-            -e|-*edit|edit)
-                EditConfig "${CONFIG_FILE}"
-                return 0
-                ;;
-            -s|-*show*|show*)
-                show_config=1
-                ;;
-            -c|--clone*|clone*)
-                clone_dir="${flagArr[$(( i + 1 ))]}"
-                [[ -n "${clone_dir}" ]] && {
-                    i=$(( i + 1 ))
-                }
-                should_clone=1
-                ;;
-            -c=*|-*clone*=*)
-                clone_dir="${arg#*=}"
-                should_clone=1
-                ;;
-            -m|-*msg)
-                MSG="${flagArr[$(( i + 1 ))]}"
-                [[ -n "${MSG}" ]] && {
-                    i=$(( i + 1 ))
-                }
-                should_clone=1
-                ;;
-            -p|-*push|push)
-                should_push=1
-                LOG_LEVEL=2
-                log debug "Backup will be pushed to github"
-                ;;
-            -*force)
-                force="--force"
-                log debug "Forcing push"
-                ;;
-            -h|-*help|help) show_help=1 ;;
+            -l|-log*)               LOG_LEVEL=${value}; [[ -z "${LOG_LEVEL}" ]] && LOG_LEVEL=1 ;;
+            -g|-gs|-git*status)     git_status=1 ;;
+            -e|-edit)               should_edit_config=1 ;;
+            -s|-show*)              show_config=1 ;;
+            -d|-debug)              LOG_LEVEL=2 ;;
+            -v|-verbose|-progress)  LOG_LEVEL=1 ;;
+            -c|--clone*)            clone_dir="${value}"; should_clone=1 ;;
+            -p|-push)               should_push=1 LOG_LEVEL=2 ;;
+            -force)                 force_push=1 ;;
+            -h|-help)               show_help=1 ;;
             *)
                 log error "Invalid flag: $arg"
                 return 1
@@ -432,12 +392,23 @@ function main() {
         esac
     done
 
+    trap Cleanup SIGINT SIGTERM
+
     mkdir -p "${CONFIG_FILE%/*}"
 
     SourceConfig "${CONFIG_FILE}"
 
+    log debug "Using GIT_DIR=$(ColorPath "${GIT_DIR}")"
+    log debug "Using git_status=$git_status"
+    log debug "Using LOG_LEVEL=$LOG_LEVEL"
+    log debug "Using SYNC_=$SYNC_"
+    [[ $LOG_LEVEL -eq 1 ]] && log debug "Verbose is set"
+    [[ $LOG_LEVEL -eq 2 ]] && log debug "Debugging enabled"
+    [[ $git_status -eq 1 ]] && log debug "git_status is set"
+
     [[ $show_help -eq 1 ]] && { Usage; return 0; }
     [[ $show_config -eq 1 ]] && { ShowConfig; return 0; }
+    [[ $should_edit_config -eq 1 ]] && { EditConfig "${CONFIG_FILE}"; return 0; }
 
     ValidatePaths COPY_FILES || return 1
     ValidateDirPaths COPY_DIRS || return 1
@@ -462,11 +433,6 @@ function main() {
             return 1
         fi
     fi
-
-    log debug "Using GIT_DIR=$(ColorPath "${GIT_DIR}")"
-    log debug "Using git_status=$git_status"
-    log debug "Using LOG_LEVEL=$LOG_LEVEL"
-    log debug "Using SYNC_=$SYNC_"
 
     # Start copying all the files to the destination
     for pair in "${COPY_FILES[@]}"; do
@@ -493,7 +459,10 @@ function main() {
     printf '\n' && log info "Dotfile directory: ${BLUE}$(ColorPath "${GIT_DIR}")${NC}\n"
 
     if [[ $should_push -eq 1 ]]; then
-        PushToRepo "${force}" || return 1
+        log debug "Backup will be pushed to github"
+
+        [[ $force_push -eq 1 ]] && log debug "Force push"
+        PushToRepo "${force_push}" || return 1
     else
         return 0
     fi

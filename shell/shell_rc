@@ -1119,7 +1119,7 @@ function psmem() {
             printf "%-20s %s\n", mb, substr($0, index($0,$2));
         }
 
-    }' <<< "$(ps --sort="-%mem" "${cmd_args[@]}" -o'user,group,rss,%mem,%cpu,command')" | grep -v "0.00 MB" | less -c -
+    }' <<< "$(ps --no-headers --sort="-%mem" "${cmd_args[@]}" -o'user,group,rss,%mem,%cpu,command')" | less -c -
 }
 
 function pscpu() {

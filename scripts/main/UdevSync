@@ -174,7 +174,7 @@ function CreateUdevSyncScript() {
         sudo mkdir -p "${script_path%/*}"
     fi
 
-    "${write[@]}" "${script_path}" > /dev/null << EOF
+    if ! "${write[@]}" "${script_path}" > /dev/null << EOF
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -402,16 +402,19 @@ function main() {
 main "\$@"
 
 EOF
-    [[ $? -eq 0 ]] || return 1
+    then
+        log error "Failed to install script"
+        return 1
+    fi
 
     if [[ $update_this_script -eq 1 ]]; then
         log info "Successfully updated '${script_path}'\n"
-    else
-        USER="${USER}"
-        sudo chown "${SUDO_USER:-${USER}}" "${script_path}"
-        sudo chmod 0755 "${script_path}"
-        log info "Successfully installed script at '${script_path}'\n"
+        return 0
     fi
+
+    sudo chown "${SUDO_USER:-${USER}}" "${script_path}"
+    sudo chmod 0755 "${script_path}"
+    log info "Successfully installed script at '${script_path}'\n"
 }
 
 function CreateSystemdService() {
@@ -440,7 +443,7 @@ function CreateSystemdService() {
         return 0
     fi
 
-"${write[@]}" "${systemd_service_file}" &> /dev/null << EOF
+    if "${write[@]}" "${systemd_service_file}" &> /dev/null << EOF
 [Unit]
 Description=Udev sync
 
@@ -454,7 +457,7 @@ WantedBy=
 
 EOF
 
-    if [[ $? -eq 0 ]]; then
+    then
         sudo systemctl --quiet daemon-reload
         log info "Custom systemd service installed and reloaded '${systemd_service_file}'\n"
     else
@@ -504,8 +507,9 @@ function CreateUdevRule() {
 
 function EditConfig() {
     local configFile="${1}"
-    local -n set_flag=${2}
-    local temp_configFile="$(mktemp -t "${configFile##*/}.XXXX")"
+    local -n update_script_ref=${2}
+    local temp_configFile=""
+    temp_configFile="$(mktemp -t "${configFile##*/}.XXXX")"
     [[ ! -s "${temp_configFile}" ]] || { log error "Could not create temp file"; return 1; }
 
     [[ ! -s "${configFile}" ]] && CreateNewUserConfig "${configFile}"
@@ -517,6 +521,7 @@ function EditConfig() {
         rm -f "${temp_configFile}"
         return 0
     fi
+    # shellcheck disable=SC1090
     source "${temp_configFile}"
     for var in ROOT_DIR ITEMS PARTITION_UUID UDEV_RULE_NAME \
         SHOULD_ARCHIVE ARCHIVE_NAME ARCHIVE_FORMAT SYSTEMD_SERVICE_NAME; do
@@ -524,6 +529,7 @@ function EditConfig() {
         if [[ ! -s "${temp_configFile}" ]]; then
             CreateNewUserConfig "${configFile}"
             cp "${configFile}" "${temp_configFile}"
+            # shellcheck disable=SC1090
             source "${temp_configFile}"
         else
             log error "'${var}' var is missing, discarding any changes you made"
@@ -532,13 +538,14 @@ function EditConfig() {
         fi
     done
     log info "New changes detected in configuration, regenerating script"
-    set_flag=1
+    # shellcheck disable=SC2034
+    update_script_ref=1
     mv "${temp_configFile}" "${configFile}"
     rm -f "${temp_configFile}"
 }
 
 function UpdateConfigVars() {
-    local -n update=$1
+    local -n update=${1}
     sed -i "s@.*${update[0]}.*@${update[0]}=${update[1]}@"
 }
 
@@ -554,12 +561,12 @@ function main() {
     local uuid="" root_dir="" archive_fmt="" archive_name=""
     local remove_pattern=""
     local systemd_service_name=""
+    # shellcheck disable=SC2034
     local -a apply_config_update=()
 
     # On-Off Flags
     local -i archive_flag=0 update_script=0
-    local -i should_cat_log=0 show_service_status=0
-    local -i is_script_installed=0
+    local -i show_service_status=0
 
     # Install flags
     local -i should_install_udev_rule=0  should_install_script=0
@@ -571,82 +578,45 @@ function main() {
     # Arg parsing
     local -i should_edit=0 show_help=0
     local -i i=0
-    while [[ $i -lt ${#args[@]} ]]; do
-        case "${args[$i]}" in
-            --edit*|edit*)
-                should_edit=1
-                ;;
-            --config*|config*)
-                should_edit=1
-                ;;
-            --*script*|--install*script*|install*script*|*script*)
-                should_install_script=1
-                ;;
-            --*rule*|--gen*rule*|install*rule*|gen*rule*|install*rule*|*rule*)
-                should_install_udev_rule=1
-                ;;
-            --service*|install*service*|service*|system*service*)
-                should_install_systemd_service=1
-                ;;
-            --all*|all*)
-                should_install_script=1
-                should_install_udev_rule=1
-                should_install_systemd_service=1
-                ;;
-            --purge*|--remove*|--disable*|purge*|remove*|disable*)
-                should_install_or_purge=0
-                ;;
-            --install*|install*|enable*)
-                should_install_or_purge=1
-                ;;
-            --update*|update*)
-                update_script=1
-                ;;
-            --uuid=*|uuid=*)
-                uuid="${args[$i]#*=}"
-                apply_config_update=( "PARTITION_UUID" "${uuid}" )
-                UpdateConfigVars apply_config_update
-                ;;
-            --uuid*|uuid*)
-                i=$((i+1))
-                [[ $i -lt ${#args[@]} ]] && uuid="${args[$i]}" || \
-                    { log error "--uuid requires value"; return 1; }
-                apply_config_update=( "PARTITION_UUID" "${uuid}" )
-                UpdateConfigVars apply_config_update
-                ;;
-            --log*|log*)
-                CheckLogs "${logfile}" $should_cat_log
-                return 0
-                ;;
-            --tail*|tail*)
-                FollowLog "${logfile}"
-                return 0
-                ;;
-            --follow*|follow*)
-                FollowLog "${logfile}"
-                return 0
-                ;;
-            --cat*log*|cat*log*)
-                should_cat_log=1
-                CheckLogs "${logfile}" $should_cat_log
-                return 0
-                ;;
-            --*status*|*status*)
-                show_service_status=1
-                ;;
-            -h|--help*|help*)
-                show_help=1
-                ;;
+
+    local arg="" value=""
+    for ((i=0;i<${#args[@]};i++)); do
+        arg="${args[$i]}"
+        [[ "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
+            value="${args[$((i+1))]:-""}" i=$((i+1))
+        if [[ "${arg}" == *=* ]]; then
+            IFS=$'=' read -r arg value <<< "${arg}"
+            [[ -n "${value}" ]] || \
+                { log error "'${arg}' requires a value"; return 1; }
+        fi
+        [[ "${arg}" == --* ]] && arg="${arg//--/-}"
+        case "${arg}" in
+            -edit)                      should_edit=1                       ;;
+            -config*)                   should_edit=1                       ;;
+            -purge*|-remove*|-disable*) should_install_or_purge=0           ;;
+            -update*)                   update_script=1                     ;;
+            -show*status*)              show_service_status=1               ;;
+            -h|-help)                   show_help=1                         ;;
+            -install*script)            should_install_script=1             ;;
+            -gen*rule*|-install*rule*)  should_install_udev_rule=1          ;;
+            -install*service*)          should_install_systemd_service=1    ;;
+            -install*)                  should_install_or_purge=1           ;;
+            -log*)                      CheckLogs "${logfile}" 0; return 0  ;;
+            -cat*log*)                  CheckLogs "${logfile}" 1; return 0  ;;
+            -tail*|-follow*)            FollowLog "${logfile}"; return 0    ;;
+            -all*)                      should_install_script=1 \
+                                        should_install_udev_rule=1 \
+                                        should_install_systemd_service=1    ;;
+            -uuid*|uuid*)               uuid="${value}"; \
+                        apply_config_update=( "PARTITION_UUID" "${uuid}" ) \
+                            UpdateConfigVars apply_config_update            ;;
             *)
                 log error "Unknown arg: '${args[$i]}'"
                 Usage "${script_install_path}" >&2
                 return 1
                 ;;
         esac
-        i=$((i+1))
     done
-
-    DependencyChecks
 
     if [[ $show_help -eq 1 ]]; then
         if [[ $should_install_udev_rule -eq 1 ]]; then
@@ -658,12 +628,13 @@ function main() {
     fi
 
     if [[ $should_edit -eq 1 ]]; then
-        if EditConfig "${config_file}" update_script; then
-            [[ $update_script -eq 0 ]] && return $? || true
-        else
-            return 1
-        fi
+        EditConfig "${config_file}" update_script
+        # If not updaing script, exit
+        [[ $update_script -eq 0 ]] && return 0
     fi
+
+    # Check dependencies before doing anything
+    DependencyChecks
 
     # Source config (retry up to 3x if incomplete)
     local source_attempt=0 should_break=0
@@ -675,6 +646,7 @@ function main() {
             CreateNewUserConfig "${config_file}" || { log error "Failed to write '${config_file}'"; return 1; }
         fi
 
+        # shellcheck disable=SC1090
         if ! source "${config_file}"; then
             log warn "Failed to source config, regenerating config"
             CreateNewUserConfig "${config_file}" || { log error "Failed to write '${config_file}'"; return 1; }
@@ -688,6 +660,7 @@ function main() {
             local should_not_match="${3:-"_NONE_"}"
 
             if [[ -n "${ref2:-""}" && "${ref2:-""}" != "${should_not_match}" ]]; then
+                # shellcheck disable=SC2034
                 ref1="${ref2:-""}"
             else
                 log error "Invalid or empty var \$${!ref2}, update the config"
@@ -709,8 +682,6 @@ function main() {
         should_break=1
     done
 
-    [[ -s "${script_install_path}" ]] && is_script_installed=1 || true
-
     [[ $show_service_status -eq 1 ]] && { ShowServiceStatus "${systemd_service_name}"; return 0; }
 
     # Install/Purge Udev Rule
@@ -720,7 +691,7 @@ function main() {
     fi
 
     # Install/Purge or update Udev Sync Script
-    if [[ ($update_script -eq 1 && $is_script_installed -eq 1) ||  $should_install_script -eq 1 ]]; then
+    if [[ ($update_script -eq 1 && -s ${script_install_path}) ]] || [[ $should_install_script -eq 1 ]]; then
         CreateUdevSyncScript \
             ITEMS "${root_dir}" "${script_install_path}" \
             "${archive_fmt}" "${archive_name}" \
@@ -740,11 +711,11 @@ function main() {
     [[ -s "/etc/systemd/system/${systemd_service_name}@.service" ]] && service_ready=1
 
     [[ $rule_ready -eq 0 && $should_install_or_purge -eq 1 ]] && \
-        { log warn "Udev rules not ready, install service: ${0##*/} install rule"; }
+        { log warn "Udev rules not ready, install service: ${script_name} -install rule"; }
     [[ $script_ready -eq 0 && $should_install_or_purge -eq 1 ]] && \
-        { log warn "Sync Script not ready, install service: ${0##*/} install script"; }
+        { log warn "Sync Script not ready, install service: ${script_name} -install script"; }
     [[ $service_ready -eq 0 && $should_install_or_purge -eq 1 ]] && \
-        { log warn "Systemd services not ready, install service: ${0##*/} install service"; }
+        { log warn "Systemd services not ready, install service: ${script_name} -install service"; }
 
     return 0
 }

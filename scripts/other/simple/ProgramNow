@@ -13,7 +13,7 @@ function main() {
     local requested_editor="$2"
 
     if [[ $# -eq 0 ]] ; then
-        echo -e "Usage: ${mild_green}$(basename $0) <Index> <EDITOR>${no_col}"
+        echo -e "Usage: ${mild_green}${0##*/} [Index] [EDITOR]${no_col}"
         return 1
     fi
 

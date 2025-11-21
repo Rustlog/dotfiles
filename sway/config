@@ -610,8 +610,7 @@ bar {
 
         # Journal time
             bindsym $mod+grave+J exec foot --app-id=journal bash -c ' \
-                command -v nvim &> /dev/null && export EDITOR=${EDITOR:-nvim}; \
-                ${HOME}/.bin/main/JournalToday edit \
+                ~/.bin/main/JournalToday edit; \
             '
 
 

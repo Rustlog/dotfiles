@@ -709,7 +709,7 @@ function MountSSHFS_() {
         if [[ ${CONFIG["MOUNT_TIMEOUT"]} -gt 0 ]]; then
             log info "auto-unmount set: ${CONFIG["MOUNT_TIMEOUT"]}"
             log cmd_info "$(${colored_cmd} <<< "(sleep ${CONFIG["MOUNT_TIMEOUT"]} && timeout 4s --signal KILL fusermount -u ${CONFIG["LOCAL_MOUNT_POINT"]}) &")" && printf '\n'
-            (sleep ${CONFIG["MOUNT_TIMEOUT"]} && timeout 4s --signal KILL fusermount -u "${CONFIG["LOCAL_MOUNT_POINT"]}") & disown
+            (sleep "${CONFIG["MOUNT_TIMEOUT"]}" && timeout 4s --signal KILL fusermount -u "${CONFIG["LOCAL_MOUNT_POINT"]}") & disown
         fi
         if [[ "${CONFIG["USER"]}" == u0_a* ]]; then
             # Special message for Termux users
@@ -836,7 +836,7 @@ function main() {
 
     if [[ $should_ls_profile_dir -eq 1 ]]; then
         printf '\n' && log info "Available profiles:\n"
-        local -a temp_tree_data=("")
+        local temp_tree_data=""
         local tree=(tree -C -Fp -sh)
         [[ $should_use_colors -eq 0  ]] && tree=(tree -n -Fp -sh)
         temp_tree_data="$("${tree[@]}" "${profile_dir}")"

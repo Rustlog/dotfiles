@@ -27,6 +27,9 @@ call plug#begin('/usr/share/nvim/NVIM')
     Plug 'morhetz/gruvbox'
     " nightwolf colorscheme
     Plug 'ricardoraposo/nightwolf.nvim'
+    " catppuccin colorscheme
+    Plug 'catppuccin/nvim', { 'as': 'catppuccin' }
+    Plug 'folke/tokyonight.nvim'
     " Markdown rendering
     " Plug 'MeanderingProgrammer/render-markdown.nvim'
 call plug#end()
@@ -52,9 +55,9 @@ inoremap <silent> <F1> <Nop>
 vnoremap <silent> <F1> <Nop>
 
 " Create new line below (Shift + Enter)
-nnoremap <silent><S-CR> :normal! o <CR>
+nnoremap <silent><S-CR> :norm! o <CR>
 " Create new line above (Ctrl + Shift + Enter)
-nnoremap <silent><C-S-CR> :normal! O <CR>
+nnoremap <silent><C-S-CR> :norm! O <CR>
 " Open Telescope file search
 nnoremap <silent><C-n> :Telescope find_files <CR>
 " Toggle NerdTree with Ctrl + Space
@@ -68,9 +71,6 @@ nnoremap <silent><F2> :call ToggleWrap() <CR>
 inoremap <silent><expr> <CR> pumvisible() ? coc#_select_confirm()
                           \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
 
-" Set color scheme to
-colorscheme gruvbox
-colorscheme molokai
 " Enable syntax highlighting
 syntax enable
 " Set tab width to 4 spaces
@@ -95,6 +95,8 @@ set mouse=i
 set cursorline
 " Enable filetype-specific plugins and indentation
 filetype plugin indent on
+" Set background dark
+set background=dark
 
 " Enable swap files (saves the cursor position and other information)
 set swapfile
@@ -104,6 +106,10 @@ set shada='1000,f0,h
 let mapleader = '\'
 
 let g:vimspector_enable_mappings = 'HUMAN'
+
+" colorscheme gruvbox
+" colorscheme molokai
+colorscheme tokyonight-night
 
 " Install vim-plug (plugin manager)
 function! InstallPlug()
@@ -137,7 +143,7 @@ command! RunC w | execute '!gcc -pedantic -Wall -Wextra -O0 ' . shellescape(expa
 command! GitAbort : !mv "%" "%.bak" | :q!
 
 " Automatically jump to the last cursor position when reopening a file
-autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") | exe "normal! g`\" | zz" | endif
+autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") | exe "norm! g`\" | zz" | endif
 " autocmd BufRead,BufNewFile *.conf set filetype=dosini
 
 " C tmeplate
@@ -200,5 +206,9 @@ autocmd BufNewFile *.sh call setline(1, [
 
 " auto chmod logic
 autocmd BufWritePost *.sh,*.py if getline(1) =~ '^#!' | silent !chmod +x '%' | endif
-autocmd BufWritePost *.c,*.cpp,*.cxx,*.cc,*.c++ silent !chmod +x '%'
+
+" Set colorscheme based on filetype
+autocmd FileType     sh,zsh,bash                colorscheme nightwolf-dark-gray
+autocmd FileType     c,cpp                      colorscheme tokyonight-moon
+autocmd FileType     iss                        colorscheme molokai
 

@@ -6,7 +6,7 @@ speed=0.02
 # threshold=0
 
 function KILL_CAVA() {
-    kill -SIGTERM $(cat "${TEMP_FILE}")
+    kill -SIGTERM "$(cat "${TEMP_FILE}")"
 }
 
 function CAVA() {

@@ -123,10 +123,10 @@ function ToggleBar() {
     use_bar_num_ref=$(( (use_bar_num_ref % 4) + 1 ))
 
     ## set the bars
-    SetBar bar cava_bar noise_level dict $use_bar_num $bar_len_ref
+    SetBar bar cava_bar noise_level dict "$use_bar_num" "$bar_len_ref"
 
     ## create fresh new the config
-    BuildConfig "${config_file_ref}" "${pipe_ref}" "${bar}" "${cava_bar}" $noise_level $framerate_ref
+    BuildConfig "${config_file_ref}" "${pipe_ref}" "${bar}" "${cava_bar}" "$noise_level" "$framerate_ref"
 
     ## re-start cava
     pkill -f "cava -p ${config_file_ref}" || { log error "Failed to kill cava"; return 1; }
@@ -178,10 +178,10 @@ function main() {
     mkdir -p "${tmp_dir}"
 
     ## set the bars
-    SetBar bar cava_bar noise_level dict $use_bar_num $bar_len
+    SetBar bar cava_bar noise_level dict "$use_bar_num" "$bar_len"
 
     ## create the config
-    BuildConfig "${config_file}" "${pipe}" "${bar}" "${cava_bar}" $noise_level $framerate
+    BuildConfig "${config_file}" "${pipe}" "${bar}" "${cava_bar}" "$noise_level" "$framerate"
 
     log info "bar num: ${use_bar_num}"
     log info "framerate: ${framerate}"

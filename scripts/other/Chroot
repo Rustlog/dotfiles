@@ -42,8 +42,7 @@ function mount_fs() {
 }
 
 function main() {
-    local partition mount_dir user_id display_type
-    local -i enable_gui=0
+    local partition="" mount_dir="" user_id=""
     local -i shift_val=2
 
     partition="${1:-""}"
@@ -53,20 +52,20 @@ function main() {
 
     user_id="$(id -u)"
 
-    check_mount "${mount_dir}"
-
     shift $shift_val; local -a args=("${@}")
+
+    check_mount "${mount_dir}"
 
     for arg in "${args[@]}"; do
         case "${arg}" in
-            gui|enable*g*) enable_gui=1 ;;
             *) log error "Invalid arg '${arg}'" ;;
         esac
     done
 
     sudo mkdir -p "${mount_dir}"
 
-    trap "sudo umount -R "${mount_dir}"; exit 0" EXIT SIGINT SIGTERM
+    # shellcheck disable=SC2064
+    trap "sudo umount -R \"${mount_dir}\"; exit 0" EXIT SIGINT SIGTERM
 
     mount_fs "${partition}" "${mount_dir}/" || return 1
     mount_fs -t proc proc "${mount_dir}/proc" || return 1

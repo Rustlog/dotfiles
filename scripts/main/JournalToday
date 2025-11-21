@@ -285,7 +285,7 @@ function main() {
             IFS=$'=' read -r arg value <<< "${arg}"
         fi
         case "${arg}" in
-            -e|-*edit|edit*) edit_journal=1 ;;
+            -e|-*edit*|edit*) edit_journal=1 ;;
             -t|-*edit*template|*edit*template*) edit_template=1 ;;
             -*show*template|*show*template*) show_template=1 ;;
             *vim|*micro|*nano) edit_journal=1 editor="${arg}" ;;
