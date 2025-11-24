@@ -11,13 +11,6 @@ function log() {
     printf '[%s]: %s\n' "${type_}" "${*}"
 }
 
-function RestoreBackup() {
-    local file="${1}"
-    if [[ -f "${file}.bak" ]];then
-        cp "${file}.bak" "${file}"
-    fi
-}
-
 function Wayland_sway_desktop() {
     local desktop_file="${1}"
     sudo tee "${desktop_file}" &>/dev/null << EOF
@@ -37,7 +30,7 @@ Type=Application
 Keywords=tiling;wayland;compositor;sway;
 
 EOF
-    sudo sed -i 's/    //g' "${desktop_file}" &
+    sudo sed -i 's/    //g' "${desktop_file}"
 }
 
 function Wayland_hyprland_desktop() {
@@ -54,7 +47,7 @@ Type=Application
 Keywords=tiling;wayland;compositor;hyprland;
 
 EOF
-    sudo sed -i 's/    //g' "${desktop_file}" &
+    sudo sed -i 's/    //g' "${desktop_file}"
 }
 
 function Wayland_plasma_desktop() {
@@ -64,12 +57,16 @@ function Wayland_plasma_desktop() {
 Name=Plasma (Wayland)
 Comment=Plasma by KDE
 DesktopNames=KDE
-Exec=env XDG_SESSION_TYPE=wayland QT_QPA_PLATFORM=wayland XDG_DESKTOP_PORTAL_BACKEND=wlr GTK_THEME=Breeze:dark QT_QPA_PLATFORMTHEME="gtk3" startplasma-wayland
+Exec=env XDG_SESSION_TYPE=wayland \
+    QT_QPA_PLATFORM=wayland \
+    XDG_DESKTOP_PORTAL_BACKEND=wlr \
+    GTK_THEME=Breeze:dark \
+    QT_QPA_PLATFORMTHEME="" startplasma-wayland
 TryExec=/usr/bin/startplasma-wayland
 Keywords=plasma;kde;
 
 EOF
-    sudo sed -i 's/    //g' "${desktop_file}" &
+    sudo sed -i 's/    //g' "${desktop_file}"
 }
 
 function Wayland_gnome_desktop() {
@@ -86,7 +83,7 @@ X-GDM-SessionRegisters=true
 X-GDM-CanRunHeadless=true
 
 EOF
-    sudo sed -i 's/    //g' "${desktop_file}" &
+    sudo sed -i 's/    //g' "${desktop_file}"
 }
 
 function X11_i3_desktop() {
@@ -103,7 +100,7 @@ X-LightDM-DesktopName=i3
 Keywords=tiling;wm;windowmanager;window;manager;
 
 EOF
-    sudo sed -i 's/    //g' "${desktop_file}" &
+    sudo sed -i 's/    //g' "${desktop_file}"
 }
 
 function X11_gnome_desktop() {
@@ -120,7 +117,7 @@ X-GDM-SessionRegisters=true
 X-GDM-CanRunHeadless=true
 
 EOF
-    sudo sed -i 's/    //g' "${desktop_file}" &
+    sudo sed -i 's/    //g' "${desktop_file}"
 }
 
 function X11_plasma_desktop() {
@@ -136,7 +133,7 @@ Comment=Plasma by KDE
 X-KDE-PluginInfo-Version=6.3.1
 
 EOF
-    sudo sed -i 's/    //g' "${desktop_file}" &
+    sudo sed -i 's/    //g' "${desktop_file}"
 }
 
 function RestoreWaylandDesktopFiles() {

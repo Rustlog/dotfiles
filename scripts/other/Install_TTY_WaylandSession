@@ -78,7 +78,7 @@ EOF
 # Install Desktop session file
     if sudo tee "${desktop_session_file_path}" &>/dev/null << EOF
 [Desktop Entry]
-Name=Sway (Sway Compositor (custom))
+Name=Sway - [custom]
 Comment=An i3 like Wayland compositor
 Exec=${script_path}
 Type=Application
@@ -144,7 +144,7 @@ EOF
 # Install Desktop session file
     if sudo tee "${desktop_session_file_path}" &>/dev/null << EOF
 [Desktop Entry]
-Name=Hyprland (Hyprland Compositor (custom))
+Name=Hyprland - [custom]
 Comment=Hyprland - dynamic tiling window manager
 Exec=${script_path}
 Type=Application

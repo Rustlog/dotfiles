@@ -189,7 +189,7 @@ function Install_AdGuardHome_runit_service() {
 
     log beautify "Installing AdGuardHome runit service"
 
-    sudo mkdir -p "${adguard_config%%/"${adguard_config##*/}"}" "${work_dir}"
+    sudo mkdir -p "${adguard_config%/*}" "${work_dir}"
 
     if cat 1> "${tmpfile}" << EOF
 #!/usr/bin/sh
@@ -712,7 +712,7 @@ function Install_utils() {
         tmux rsync dnsmasq hostapd polkit elogind nftables
         zsh zsh-syntax-highlighting openvpn zbar cronie
         bat eza fzf jq lesspipe lsd micro ncdu neovim nodejs ripgrep
-        fuse-sshfs lsof rsyslog plymouth man-db mlocate
+        fuse-sshfs lsof rsyslog plymouth man-db mlocate ngetty
         xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
         chafa numactl
         libwebp-tools # cwewp
@@ -744,8 +744,9 @@ function Install_service() {
 
     for service in "${services[@]}"; do
         case "${service}" in
-            *nbfc*) Install_nbfc_fancontrol_runit_service "nbfc-linux" ;;
-            *adguard*) Install_AdGuardHome_runit_service "adguardhome" ;;
+            nbfc*) Install_nbfc_fancontrol_runit_service "nbfc-linux" ;;
+            adguard*) Install_AdGuardHome_runit_service "adguardhome" ;;
+            zram*) Install_Zram "zram0" ;;
         esac
     done
 }

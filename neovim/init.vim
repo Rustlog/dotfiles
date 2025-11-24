@@ -1,76 +1,3 @@
-" Plugin manager (vim-plug)
-
-source /usr/share/nvim/NVIM/plug.vim
-
-call plug#begin('/usr/share/nvim/NVIM')
-    " Rust syntax and highlighting support
-    Plug 'rust-lang/rust.vim'
-    " Auto-completion, diagnostics, and more
-    Plug 'neoclide/coc.nvim', {'branch': 'release'}
-    " Easy commenting of code
-    Plug 'tpope/vim-commentary'
-    " Enhanced C++ syntax highlighting
-    Plug 'octol/vim-cpp-enhanced-highlight'
-    " File explorer sidebar
-    Plug 'preservim/nerdtree'
-    " Status line plugin for a more beautiful interface
-    Plug 'vim-airline/vim-airline'
-    " Utility library for Lua plugins
-    Plug 'nvim-lua/plenary.nvim'
-    " Fuzzy finder for files, buffers, etc.
-    Plug 'nvim-telescope/telescope.nvim'
-    " Debugging with vimspector
-    " Plug 'puremourning/vimspector'
-    " Molokai colorscheme
-    Plug 'tomasr/molokai'
-    " gruvbox colorscheme
-    Plug 'morhetz/gruvbox'
-    " nightwolf colorscheme
-    Plug 'ricardoraposo/nightwolf.nvim'
-    " catppuccin colorscheme
-    Plug 'catppuccin/nvim', { 'as': 'catppuccin' }
-    Plug 'folke/tokyonight.nvim'
-    " Markdown rendering
-    " Plug 'MeanderingProgrammer/render-markdown.nvim'
-call plug#end()
-
-" Open new tab, switch to next tab, and close current tab
-nnoremap <silent><leader>t :tabnew<CR>
-nnoremap <silent><leader>n :tabmove<CR>
-nnoremap <silent><leader>p :tabprevious<CR>
-nnoremap <silent><leader>q :tabclose<CR>
-
-" Move lines up/down in normal, visual, and insert modes
-nnoremap <silent><A-j> :move .+1 <CR>==
-vnoremap <silent><A-j> :move '>+1 <CR>gv=gv
-inoremap <silent><A-j> <ESC>:move .+1 <CR>==gi
-
-nnoremap <silent><A-k> :move .-2 <CR>==
-vnoremap <silent><A-k> :move '<-2 <CR>gv=gv
-inoremap <silent><A-k> <ESC>:move .-2 <CR>==gi
-
-" Disable F1 key (bind to no operation)
-nnoremap <silent> <F1> <Nop>
-inoremap <silent> <F1> <Nop>
-vnoremap <silent> <F1> <Nop>
-
-" Create new line below (Shift + Enter)
-nnoremap <silent><S-CR> :norm! o <CR>
-" Create new line above (Ctrl + Shift + Enter)
-nnoremap <silent><C-S-CR> :norm! O <CR>
-" Open Telescope file search
-nnoremap <silent><C-n> :Telescope find_files <CR>
-" Toggle NerdTree with Ctrl + Space
-nnoremap <silent><C-Space> :NERDTreeToggle<CR>
-" Toggle wrap and nowrap with F2
-
-" Toggle wrap and nowrap with F2
-nnoremap <silent><F2> :call ToggleWrap() <CR>
-
-" Confirm Coc completion (when pop-up menu is visible) in insert mode
-inoremap <silent><expr> <CR> pumvisible() ? coc#_select_confirm()
-                          \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
-
 " Enable syntax highlighting
 syntax enable
 " Set tab width to 4 spaces
@@ -103,25 +30,39 @@ set swapfile
 " Enable shada (persistent history and cursor position saving)
 set shada='1000,f0,h
 
+" Set leader map
 let mapleader = '\'
 
-let g:vimspector_enable_mappings = 'HUMAN'
+" Open new tab, switch to next tab, and close current tab
+nnoremap <silent><leader>t :tabnew<CR>
+nnoremap <silent><leader>n :tabmove<CR>
+nnoremap <silent><leader>p :tabprevious<CR>
+nnoremap <silent><leader>q :tabclose<CR>
 
-" colorscheme gruvbox
-" colorscheme molokai
-colorscheme tokyonight-night
+" Move lines up/down in normal, visual, and insert modes
+nnoremap <silent><A-j> :move .+1 <CR>==
+vnoremap <silent><A-j> :move '>+1 <CR>gv=gv
+inoremap <silent><A-j> <ESC>:move .+1 <CR>==gi
 
-" Install vim-plug (plugin manager)
-function! InstallPlug()
-    call system('curl -fsSLo /usr/share/nvim/NVIM/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim')
-endfunction
-command! InstallPlug call InstallPlug()
+nnoremap <silent><A-k> :move .-2 <CR>==
+vnoremap <silent><A-k> :move '<-2 <CR>gv=gv
+inoremap <silent><A-k> <ESC>:move .-2 <CR>==gi
 
-" Uninstall/Remove Plug
-function! RemovePlug()
-    execute '!rm -r /usr/share/nvim/VIM'
-endfunction
-command! RemovePlug :call RemovePlug
+" Disable F1 key (bind to no operation)
+nnoremap <silent> <F1> <Nop>
+inoremap <silent> <F1> <Nop>
+vnoremap <silent> <F1> <Nop>
+
+" Create new line below (Shift + Enter)
+nnoremap <silent><S-CR> :norm! o <CR>
+" Create new line above (Ctrl + Shift + Enter)
+nnoremap <silent><C-S-CR> :norm! O <CR>
+" Toggle NerdTree with Ctrl + Space
+nnoremap <silent><C-Space> :NERDTreeToggle<CR>
+" Toggle wrap and nowrap with F2
+
+" Toggle wrap and nowrap with F2
+nnoremap <silent><F2> :call ToggleWrap() <CR>
 
 " Toggle wrap lines
 function! ToggleWrap()
@@ -204,11 +145,154 @@ autocmd BufNewFile *.sh call setline(1, [
     \ ''
 \])
 
+" Plugin manager (lazy.vim)
+
+lua <<EOF
+
+local lazypath = "/usr/share/nvim/lazy_plugins/lazy.nvim"
+
+-- Clone it as root
+if vim.fn.getenv('UID') == 0 then
+    if vim.loop.fs_stat(lazypath) then
+        print("Cloning lazy.nvim system-wide into /usr/share/nvim/lazy_plugins ...")
+      vim.fn.system({
+          "git", "clone", "--filter=blob:none", "--branch=stable",
+          "https://github.com/folke/lazy.nvim.git", lazypath,
+      })
+      if vim.v.shell_error ~= 0 then
+          vim.api.nvim_err_writeln("Failed to clone lazy.nvim system-wide")
+          os.exit(1)
+      end
+    end
+else
+    if not vim.loop.fs_stat(lazypath) then
+        print("Run neovim as root once to install it systemd-wide")
+        print("\nPress any to exit...")
+        vim.fn.getchar()
+    end
+end
+
+vim.opt.runtimepath:prepend(lazypath)
+
+require("lazy").setup({
+    root          = "/usr/share/nvim/lazy_plugins",
+    defaults      = { lazy = true },
+    install       = { colorscheme = { "habamax" } },
+    checker       = { enabled = false, notify = false }, -- Do not check for updates
+    concurrency   = 20,
+
+    spec = {
+      -- Core plugins
+        { "octol/vim-cpp-enhanced-highlight",                                                               },
+        { "nvim-lua/plenary.nvim",                                                                          },
+        { "tpope/vim-commentary",             event = "VeryLazy"                                            },
+        { "nvim-telescope/telescope.nvim",    dependencies = { "nvim-lua/plenary.nvim" },
+        cmd =  "Telescope", keys = { { "<C-n>", "<cmd>Telescope find_files<CR>" , desc = "Find files"}}     },
+        { "nvim-lualine/lualine.nvim",        dependencies = { "nvim-tree/nvim-web-devicons" },
+                                              event = "VeryLazy",
+                                              opts = {
+                                                  options = { theme = "papercolor_dark" }
+                                              }                                                             },
+        { "nvim-telescope/telescope.nvim",    dependencies = "nvim-lua/plenary.nvim"                        },
+        { "echasnovski/mini.align",           branch = "stable", config = true                              },
+        { "puremourning/vimspector"                                                                         },
+        { "MeanderingProgrammer/render-markdown.nvim",
+                                              ft = {"markdown","quarto"}, config = true                     },
+        -- COLORSCHEMES
+        { "folke/tokyonight.nvim", lazy = false, priority = 1000, name = "tokyonight"                       },
+        { "morhetz/gruvbox", lazy = false, priority = 1000                                                  },
+        { "tomasr/molokai", lazy = false, priority = 1000                                                   },
+        { "ricardoraposo/nightwolf.nvim", lazy = false, priority = 1000                                     },
+        { "catppuccin/nvim", name = "catppuccin", lazy = false, priority = 1000                             },
+
+        -- Native lsp stack
+        { "williamboman/mason.nvim", config = true                                                          },
+        { "williamboman/mason-lspconfig.nvim"                                                               },
+        { "neovim/nvim-lspconfig"                                                                           },
+
+        -- COMPLETION (Enter confirms)
+        { "hrsh7th/nvim-cmp", event = "InsertEnter", dependencies = {
+            "hrsh7th/cmp-nvim-lsp",
+            "hrsh7th/cmp-buffer",
+            "hrsh7th/cmp-path",
+            "L3MON4D3/LuaSnip",
+            "saadparwaiz1/cmp_luasnip",
+          }, config = function()
+            local cmp = require("cmp")
+            cmp.setup{
+              snippet = { expand = function(args) require("luasnip").lsp_expand(args.body) end },
+              mapping = cmp.mapping.preset.insert({
+                ["<CR>"]  = cmp.mapping.confirm({ select = true }),  -- Enter = confirm
+                ["<Tab>"] = cmp.mapping.select_next_item(),
+                ["<S-Tab>"] = cmp.mapping.select_prev_item(),
+              }),
+              sources = {
+                { name = "nvim_lsp" },
+                { name = "luasnip" },
+                { name = "buffer" },
+                { name = "path" },
+              },
+            }
+          end,
+        },
+
+        -- Auto-install servers + keymaps
+        { "williamboman/mason-lspconfig.nvim", config = function()
+            require("mason-lspconfig").setup{
+              ensure_installed = {
+                "lua_ls", "ts_ls", "pyright", "rust_analyzer",
+                "gopls", "bashls", "html", "cssls", "jsonls",
+                "clangd", "volar", "sqlls", "cmake",
+              },
+              automatic_installation = true,
+            }
+
+            local lspconfig = require("lspconfig")
+            local servers = {
+                "lua_ls", "ts_ls", "pyright", "rust_analyzer",
+                "gopls", "bashls", "html", "cssls", "jsonls",
+                "clangd", "volar", "sqlls", "cmake",
+                }
+            for _, server in ipairs(servers) do
+              lspconfig[server].setup{}
+            end
+
+            lsp.config.clangd.setup {
+                "clangd", "--background-index", "--clang-tidy", "--header-insertion=iwyu"
+            }
+
+            vim.api.nvim_create_autocmd("LspAttach", {
+              callback = function(ev)
+                local map = function(k, cmd, desc)
+                  vim.keymap.set("n", k, cmd, { buffer = ev.buf, desc = "LSP: " .. desc })
+                end
+                map("gd", vim.lsp.buf.definition, "Goto definition")
+                map("gr", vim.lsp.buf.references, "References")
+                map("K",  vim.lsp.buf.hover, "Hover")
+                map("<leader>rn", vim.lsp.buf.rename, "Rename")
+                map("<leader>ca", vim.lsp.buf.code_action, "Code action")
+              end,
+            })
+          end,
+        },
+    }
+
+})
+EOF
+
+" :) Afer plugins load
+
+" colorscheme gruvbox
+" colorscheme molokai
+colorscheme tokyonight-night
+
 " auto chmod logic
 autocmd BufWritePost *.sh,*.py if getline(1) =~ '^#!' | silent !chmod +x '%' | endif
 
 " Set colorscheme based on filetype
-autocmd FileType     sh,zsh,bash                colorscheme nightwolf-dark-gray
-autocmd FileType     c,cpp                      colorscheme tokyonight-moon
-autocmd FileType     iss                        colorscheme molokai
+augroup ColorSchemeSelector
+    autocmd FileType     sh,zsh,bash                colorscheme nightwolf-dark-gray
+    autocmd FileType     c,cpp                      colorscheme tokyonight-moon
+    autocmd FileType     iss                        colorscheme molokai
+augroup END
 
