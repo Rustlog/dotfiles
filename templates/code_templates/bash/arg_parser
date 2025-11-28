@@ -47,21 +47,20 @@ function parse_args() {
     local arg="" value=""
     for ((i=0;i<${#args[@]};i++)); do
         arg="${args[$i]}"
-        [[ "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
+        [[ -n "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
             value="${args[$((i+1))]:-""}" i=$((i+1))
-        if [[ "${arg}" == *=* ]]; then
+        if [[ "${arg}" == -* && "${arg}" == *=* ]]; then
             IFS=$'=' read -r arg value <<< "${arg}"
             [[ -n "${value}" ]] || \
                 { log error "'${arg}' requires a value"; return 1; }
         fi
-        [[ "${arg}" == --* ]] && arg="${arg//--/-}"
         case "${arg}" in
-            -flag1) flag1_var="${value}" ;;
-            -flag2) flag2_var="${value}" ;;
-            -flag3) flag3_var="${value}" ;;
-            -flag4) flag4_var="${value}" ;;
-            -flag5) flag5_var="${value}" ;;
-            -flag6) flag6_var="${value}" ;;
+            --flag1) flag1_var="${value}" ;;
+            --flag2) flag2_var="${value}" ;;
+            --flag3) flag3_var="${value}" ;;
+            --flag4) flag4_var="${value}" ;;
+            --flag5) flag5_var="${value}" ;;
+            --flag6) flag6_var="${value}" ;;
             *) log error "Invalid argument: '${arg}'" ;;
         esac
     done

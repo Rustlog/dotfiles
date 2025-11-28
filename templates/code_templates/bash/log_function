@@ -6,8 +6,8 @@ NO_COLOR=0
 
 function log() {
     local _type="${1}"; shift
-    local _color="" _t=""
-    if [[ $NO_COLOR -eq 0 ]]; then
+    local _color="" _t="" _exit_code=0
+    if [[ $NO_COLOR -eq 0 ]] && [[ -t 1 ]]; then
         local -g _info_color="\033[38;2;85;255;126m" \
             _warn_color="\033[38;2;255;170;10m" \
             _error_color="\033[38;2;244;29;31m" \
@@ -19,14 +19,16 @@ function log() {
         _fatal_color="" _other_color="" _nc=""
     fi
     case "${_type}" in
-        info) _color="${_info_color:-""}" _t="*"    ;;
-        warn) _color="${_warn_color:-""}" _t="^"    ;;
-        error) _color="${_error_color:-""}" _t="!"  ;;
-        fatal) _color="${_fatal_color:-""}" _t="#"  ;;
-        *) _color="${_other_color-""}" _t=""        ;;
+        info) _color="${_info_color:-""}" _t="*"            ;;
+        warn) _color="${_warn_color:-""}" _t="^"            ;;
+        error) _color="${_error_color:-""}" _t="!" _exit_code=1 ;;
+        fatal) _color="${_fatal_color:-""}" _t="#" _exit_code=1 ;;
+        *) _color="${_other_color-""}" _t=""                ;;
     esac
 
-    printf "[%b%s%b%s]: %b\n" "${_color}" "${_type}" "${_nc}" "${_t}" "${*}"
+    printf "[%b%s%b%s]: %s: %b\n" \
+        "${_color}" "${_type}" "${_nc}" "${_t}" "${FUNCNAME[1]}()" "${*}"
+    return $_exit_code
 }
 
 function main() {

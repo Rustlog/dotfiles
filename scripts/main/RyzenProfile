@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
 
+# RyzenProfile - Ryzen power profile daemon using ryzenajd
+# Single file (this cli) installs Init service and daemon script
+#
+# Features:
+#   - Captures live OEM limits once at install
+#   - Generates 38-100% power profiles automatically from cached OEM limits
+#   - Hot switching profiles 'ryzenprofile -s -p powersave -a'
+#   - Summary of installed profiles 'ryzenprofile -l'
+#   - Live view of active and unmanaged workers 'ryzenprofile --show'
+#
+# Author: Rustlog
+# LICENSE: MIT
+# Homepage: https://github.com/rustlog/ryzenprofile
+#
+
 # Enable exit on error, unset var, or pipe fail
-set -euo pipefail
+builtin set -euo pipefail
 
 # Global defaults
 SCRIPT_NAME="$(readlink -f "${0}")"
@@ -9,7 +24,7 @@ SCRIPT_NAME="${SCRIPT_NAME##*/}"
 CONFIG_DIR="/etc/${SCRIPT_NAME,,}"
 PROFILES_DIR="${CONFIG_DIR}/profiles"
 F_CONFIG_FILE="${CONFIG_DIR}/config"
-F_CURRENT_POWER_PROFILE="${CONFIG_DIR}/current_profile"
+F_CURRENT_POWER_PROFILE="${CONFIG_DIR}/power_profile"
 F_STOCK_LIMITS="${CONFIG_DIR}/stock_limits"
 RYZENADJ_PATH="$(command -v ryzenadj)"
 POWER_PROFILE="balanced"
@@ -17,8 +32,6 @@ SERVICE_DIR=""
 POSIX_SCRIPT=""
 SERVICE_NAME=""
 INIT_SYSTEM=""
-SERVICE_DIR=""
-POSIX_SCRIPT=""
 VERBOSE=0
 
 # Pretty logger
@@ -125,21 +138,21 @@ function create_dir() {
 }
 
 # HELPER function -- Move src (file) to dest (file)
+# or install dest file with mode and perms
 function Install() {
-    local src="${1:-""}" dest="${2:-""}"
+    local f_src_file="${1:-""}" f_dest_file="${2:-""}"
     local owners="${3:-"root:root"}" mode="${4:-"644"}"
-    local msg="${5:-""}"
-    require_var "${dest}" error "Cannot install 'dest' var is empty"
-    sudo mkdir -p "${dest%/*}"
-    sudo touch "${dest}"
-    [[ -n "${src}" ]] && sudo mv "${src}" "${dest}"
-    sudo chown "${owners}" "${dest}"
-    if sudo chmod "${mode}" "${dest}"; then
-        [[ -n "${msg}" ]] && { log ex_info "${msg}"; return 0; }
-    else
-        log error "Failed to install '${dest}'"
+    local info_msg="${5:-""}"
+    require_var "${f_dest_file}" error \
+        "Cannot procceed to install 'f_dest_file' var is empty"
+    sudo mkdir -p "${f_dest_file%/*}"
+    [[ ! -f "${f_dest_file}" ]] && sudo touch "${f_dest_file}"
+    [[ -n "${f_src_file}" ]] && sudo mv "${f_src_file}" "${f_dest_file}"
+    if ! sudo chown "${owners}" "${f_dest_file}" && \
+        sudo chmod "${mode}" "${f_dest_file}"; then
         return 1
     fi
+    [[ -n "${info_msg}" ]] && { log ex_info "${info_msg}"; return 0; }
     return 0
 }
 
@@ -437,7 +450,8 @@ function GenerateRyzenProfiles() {
         tmp="$(GenProfile "${percent}" 0)"
         tmp_file="$(mktemp)"
         printf '%s\n' "${tmp}" 1> "${tmp_file}"
-        Install "${tmp_file}" "${PROFILES_DIR}/${profile_name}" "root:root" "644" ""
+        Install "${tmp_file}" "${PROFILES_DIR}/${profile_name}" "root:root" "644" "" || \
+            log error "Failed to install profile '${PROFILES_DIR}/${profile_name}'"
         i=$((i+1))
     done
     log info "Generated $((i/2)) power profiles"
@@ -675,7 +689,8 @@ function InstallRunitService() {
 
     # Install a runit's log service
     Install "" "${log_service}" "root:root" "0755" \
-        "Installed runit log service '${log_service}'"
+        "Installed runit log service '${log_service}'" || \
+            log error "Failed to install ${INIT_SYSTEM} log service"
 
     # Fill with content
     sudo tee "${log_service}" &>/dev/null << EOF
@@ -877,6 +892,7 @@ function Check_SH() {
 function main() {
 
     local -a args=("${@}")
+
     local -i uninstall=0 install=0 check_service=0 set_profile=0
     local -i should_list_profiles=0 apply_profile=0
     local -i show_usage=0 show_status=0 kill_stale_processes=0
@@ -895,26 +911,35 @@ function main() {
             IFS=$'=' read -r arg value <<< "${arg}"
             require_var "${value}" error "'${arg}' requires a value"
         fi
-        [[ "${arg}" == --* ]] && arg="${arg//--/-}"
         case "${arg}" in
-            -a|-apply)          apply_profile=1                     ;;
-            -n|-service*)       service_name_override="${value}"    ;;
-            -s|-set)            set_profile=1                       ;;
-            -p|-profile)        default_profile_override="${value}" ;;
-            -l|-list*|-show*)   should_list_profiles=1              ;;
-            -status)            show_status=1                       ;;
-            -init)              should_init=1                       ;;
-            -k|-kill*stale)     kill_stale_processes=1              ;;
-            -r|-ryzenadj-path)  ryzenadj_path_override="${value}"   ;;
-            -g|-generate*)      gen_profiles=1                      ;;
-            -u|-uninstall)      uninstall=1                         ;;
-            -i|-install)        install=1                           ;;
-            -c|-check)          check_service=1                     ;;
-            -h|-help)           show_usage=1                        ;;
-            -v|-verbose)        verbose=1                           ;;
+            -a|--apply)          apply_profile=1                     ;;
+            -n|--service*)       service_name_override="${value}"    ;;
+            -s|--set)            set_profile=1                       ;;
+            -p|--profile)        default_profile_override="${value}" ;;
+            -l|--list*|-show*)   should_list_profiles=1              ;;
+            --status)            show_status=1                       ;;
+            --init)              should_init=1                       ;;
+            -k|--kill*stale)     kill_stale_processes=1              ;;
+            -r|--ryzenadj-path)  ryzenadj_path_override="${value}"   ;;
+            -g|--generate*)      gen_profiles=1                      ;;
+            -u|--uninstall)      uninstall=1                         ;;
+            -i|--install)        install=1                           ;;
+            -c|--check)          check_service=1                     ;;
+            -h|--help)           show_usage=1                        ;;
+            -v|--verbose)        verbose=1                           ;;
             *) log error "Unknown option: '${arg}', use -help to see options" ;;
         esac
     done
+
+    # shellcheck disable=SC1090
+    source "${F_CONFIG_FILE:-""}"
+
+    # Overrides
+    require_var "${ryzenadj_path_override}" && RYZENADJ_PATH="${ryzenadj_path_override}"
+    require_var "${CURRENT_PROFILE:-""}" && POWER_PROFILE="${CURRENT_PROFILE}"
+    require_var "${default_profile_override}" && POWER_PROFILE="${default_profile_override}"
+    require_var "${service_name_override}" && SERVICE_NAME="${service_name_override}"
+    is_flag_enabled "$verbose" && VERBOSE=1
 
     # Init system detection
     if command -v "systemctl" &> /dev/null; then
@@ -928,9 +953,6 @@ function main() {
     else
         INIT_SYSTEM="Unknown"
     fi
-
-    # Override
-    is_flag_enabled "$verbose" && VERBOSE=1
 
     # First message
     log info "Init system: '${INIT_SYSTEM}'"
@@ -950,9 +972,6 @@ function main() {
     # Generate default config if it does not exist
     require_file "${F_CONFIG_FILE:-""}" || WriteDefaultConfig
 
-    # shellcheck disable=SC1090
-    source "${F_CONFIG_FILE:-""}"
-
     # Fallback service name if no SERVICE_NAME found in config
     require_var "${SERVICE_NAME:-""}" || SERVICE_NAME="${SCRIPT_NAME}"
 
@@ -961,12 +980,6 @@ function main() {
 
     # Generate profiles
     require_dir "${PROFILES_DIR:-""}" || GenerateRyzenProfiles
-
-    # Overrides
-    require_var "${ryzenadj_path_override}" && RYZENADJ_PATH="${ryzenadj_path_override}"
-    require_var "${CURRENT_PROFILE:-""}" && POWER_PROFILE="${CURRENT_PROFILE}"
-    require_var "${default_profile_override}" && POWER_PROFILE="${default_profile_override}"
-    require_var "${service_name_override}" && SERVICE_NAME="${service_name_override}"
 
     # Set profile
     is_flag_enabled "$set_profile" && SetProfile

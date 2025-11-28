@@ -1,11 +1,9 @@
 # Personal dotfiles
 
-## This is a personal dotfile repo for the Void Linux setup.
+## This is my personal dotfile repo for the Void Linux setup.
 
-## Screenshot1
+## WM (Window manager - sway)
 ![](docs/images/void-linux-fastfetch-output.webp)
-## Screenshot2
-![](docs/images/void-linux-)
 
 #### Core configuration (Main setup):
 - **Scripts:** [Handy scripts (MountSSH, Dotsync, JournalToday and more)](scripts/)
@@ -34,11 +32,11 @@
 |   `-- waybar/
 |-- i3/                         # Old i3
 |   `-- wallpapers/
-|-- scripts/                    # Personal configs
+|-- scripts/                    # Personal scripts
 |   |-- main/
 |   `-- other/
-|-- shell/
-|-- waybar/                     # Waybar status bar config
+|-- shell/                      # Main shell config for bash and ZSH
+|-- waybar/                     # Waybar - status bar config
 |   `-- scripts/
 |-- neovim/                     # Neovim config
 |-- vim/                        # Vim config
@@ -60,8 +58,8 @@
 
 ```
 
-### Main dotfile manager
-**scripts/dotsync**: is being the main manager of this repo, it can backup up config, clone, sync, and push push your dotfiles.
+### Dotfile manager
+**scripts/main/Dotsync**: is the main tool to sync system and user settings into dotfile repo, it can backup up config, clone, sync, and push push your dotfiles.
 
 ### Notes
 -  -> These dotfiles are for my own personal use, but feel free to borrow anything you like!

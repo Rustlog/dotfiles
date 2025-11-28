@@ -11,7 +11,7 @@ open_pdf = [
     { run = 'okular "$@" & disown',                         desc = "Okular", for = "unix" },
 ]
 imv_feh = [
-    { run = 'command -v imv && viewer=imv || viewer=feh; ${viewer} -- "$@" & disown',                   desc = "Open Image", block = false, for = "unix" },
+    { run = 'command -v imv && viewer=imv || viewer=feh; ${viewer} -- "$@" &',                   desc = "Open Image", block = false, for = "unix" },
 ]
 xdg_open = [
     { run = 'xdg-open "$@" &',                              desc = "xdg open", for = "unix" },

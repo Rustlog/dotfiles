@@ -514,6 +514,7 @@ function Install_graphics_tools() {
         Vulkan-Tools Vulkan-Headers
         vulkan-loader vulkan-loader-32bit
         vkBasalt
+        linux-tools
     )
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
@@ -559,6 +560,7 @@ function Install_browsers() {
         qutebrowser python3-adblock
         opera tor
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
 
@@ -567,6 +569,7 @@ function Install_terminals() {
     local -a XBPSPkgs=(
         alacritty foot
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
 
@@ -578,6 +581,7 @@ function Install_Audio() {
         pavucontrol cava
         easyeffects calf lsp-plugins
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
     Enable_service rtkit
     Enable_pipewire_configs
@@ -589,6 +593,7 @@ function Install_monitors() {
         htop iftop btop nmon nvtop
         powertop
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
     Enable_service tlp
 }
@@ -598,6 +603,7 @@ function DataBase_management() {
     local -a XBPSPkgs=(
         postgresql mysql
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
 
@@ -613,6 +619,7 @@ function Install_dev_tools() {
         boost boost-devel # portable C++ libraries
         clang-tools-extra # for clangd
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
 
@@ -621,6 +628,7 @@ function Install_term_filemanagers() {
     local -a XBPSPkgs=(
         yazi vifm ranger nautilus dolphin konsole
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
 
@@ -634,6 +642,7 @@ function Install_sway_setup() {
         hyprlock
         socat # unix socket
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
 
@@ -651,6 +660,7 @@ function Install_hyprland() {
         hyprland-qt-support hyprland-protocols
         xdg-desktop-portal-hyprland swww
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
 
@@ -658,9 +668,10 @@ function Install_fonts_and_themes() {
     local -a XBPSPkgs=(
         font-adobe-source-code-pro source-sans-pro
         font-awesome font-awesome5 font-awesome6 font-firacode font-hack-ttf
-        noto-fonts-emoji noto-fonts-ttf noto-fonts-cjk
+        noto-fonts-emoji noto-fonts-ttf noto-fonts-cjk terminus-font
         qt6ct breeze-gtk breeze-qt6 # theme
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
 
@@ -670,8 +681,20 @@ function Install_productivity() {
         blender krita gimp libreoffice-base
         kdenlive obs sublime-text4
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
 }
+
+function Install_QEMU() {
+    MSG="QEMU"
+    local -a XBPSPkgs=(
+        qemu-system-amd64 qemu-img qemu-doc
+        qemu-img
+    )
+
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+}
+
 function Install_misc_tools() {
     MSG="Miscellaneous Tools"
     local -a XBPSPkgs=(
@@ -689,6 +712,7 @@ function Install_misc_tools() {
         # Networking tools
         net-tools
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
     # Enable_service acpid
     Enable_service dbus
@@ -702,7 +726,40 @@ function Install_pentest_and_sec() {
         nmap metasploit hydra john sqlmap
         nikto dirb gobuster ffuf
     )
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+}
+
+function Install_Greeter() {
+    MSG="Utils"
+    local -a XBPSPkgs=(
+        greetd # greeter daemon
+        tuigreet # TUI UI
+        fbterm
+    )
+
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+
+    # greetd + tuigreet setup
+
+    local greetd_file="/etc/greetd/config.toml"
+
+    sudo mkdir -p "${greetd_file%/*}"
+
+sudo tee "${greetd_file}" &> /dev/null << EOF
+[terminal]
+vt = next
+
+[default_session]
+command = "tuigreet --time --asterisks --user-menu --remember --remember-user-session --sessions '/usr/share/wayland-sessions' --xsessions '/usr/share/xsessions' --power-shutdown 'loginctl poweroff' --power-reboot 'loginctl reboot' --theme dark --cmd sway"
+
+user = "_greeter"
+
+EOF
+
+    # Enable_service greetd
+    log info "Enable greetd 'sudo ln -s /etc/sv/greetd /var/service/'"
+
 }
 
 function Install_utils() {
@@ -714,7 +771,7 @@ function Install_utils() {
         bat eza fzf jq lesspipe lsd micro ncdu neovim nodejs ripgrep
         fuse-sshfs lsof rsyslog plymouth man-db mlocate ngetty
         xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
-        chafa numactl
+        chafa numactl fbterm
         libwebp-tools # cwewp
         ImageMagic NetworkManager network-manager-applet # Network Manager
         wireless_tools # for iwlist
@@ -723,13 +780,16 @@ function Install_utils() {
         chrony # time
         mako # Notification daemon
     )
-    sudo touch /etc/nftables.conf
+
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+
+    sudo touch /etc/nftables.conf
     Enable_service NetworkManager
     Enable_service elogind
     Enable_service polkitd
     Enable_service rsyslogd
     Enable_service crond
+    Enable_service ngetty
     Enable_service chronyd && sudo chronyc makestep
     Enable_service nftables
 }

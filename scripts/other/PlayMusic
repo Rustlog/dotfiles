@@ -17,6 +17,7 @@ declare -a  MPV_FLAGS=()
 declare -a SELECTED=() CURRENTLY_PLAYING=()
 
 QUIET=0
+DETACH=0
 
 MUSIC_DIR="${HOME}/Music"
 
@@ -33,7 +34,7 @@ function LOG() {
         cmd_info)
             [[ "${QUIET}" -eq 0 ]] && \
                 { printf "[%b%s%b]: " "${GREEN}" "${type_}" "${NC}"; \
-                    for m in "${@}"; do printf '%b ' "${m}\b"; done; printf '\n'; }
+                    for m in "${@}"; do printf '%b ' "${m}"; done; printf '\n'; }
             ;;
         warn) printf '[%b%s%b]: %b\n' "${WARN}" "^" "${NC}" "${*}" ;;
         error) printf '[%b%s%b]: %b\n' "${RED}" "!" "${NC}" "${*}" ;;
@@ -117,7 +118,11 @@ function TurnMusicOn() {
         done
         printf '\n'
         LOG cmd_info "${BROWN}mpv${NC}" "${MPV_FLAGS[@]}" "${quoted_files[@]}"
-        mpv "${MPV_FLAGS[@]}" "${files_joined[@]/#/${MUSIC_DIR}/}"
+        if [[ $DETACH -eq 1 ]]; then
+            mpv "${MPV_FLAGS[@]}" "${files_joined[@]/#/${MUSIC_DIR}/}" & disown
+        else
+            mpv "${MPV_FLAGS[@]}" "${files_joined[@]/#/${MUSIC_DIR}/}"
+        fi
         printf '\n'
     fi
 }
@@ -168,6 +173,7 @@ function main() {
             -t|-*tui|tui) ENABLE_MPV_TUI=1 ;;
             -a|-*play*all|play*all|all) play_all=1 ;;
             -s|--shuff|shuff|--shuffle|shuffle) shuffle=1 ;;
+            -d|--disown|--detach)  DETACH=1 ;;
             -h|--help|help) Usage; Exit 0 ;;
             *)
                 if [[ -d "${arg}" ]];then
@@ -202,7 +208,7 @@ function main() {
 
     MPV_FLAGS+=(
         "--vid=${video:-"no"}"
-        "--volume=${volume:-94}"
+        "--volume=${volume:-64}"
     )
 
     MPV_FLAGS+=(

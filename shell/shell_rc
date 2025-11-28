@@ -95,10 +95,11 @@ function Alias_vars() {
     _CD_DIRS="mkdir -p \${dir} && cd \${dir}; unset dir"
     alias M="dir=\${HOME}/Music && ${_CD_DIRS}"
     alias P="dir=\${HOME}/Pictures && ${_CD_DIRS}"
-    alias G="dir=\${HOME}/Grim_Screenshots && ${_CD_DIRS}"
     alias V="dir=\${HOME}/Videos && ${_CD_DIRS}"
     alias D="dir=\${HOME}/Downloads && ${_CD_DIRS}"
     alias L="dir=\${HOME}/LearnDir && ${_CD_DIRS}"
+    alias R="dir=\${HOME}/dev/repos && ${_CD_DIRS}"
+    alias p="dir=\${HOME}/dev/projects && ${_CD_DIRS}"
     alias d="dir=\${HOME}/dev && ${_CD_DIRS}"
     alias lfcd="cd \$(lf -last-dir-path=/dev/stdout)"
     alias media="/run/media/\${USER}"
@@ -850,7 +851,8 @@ function SetLocale() {
 # Generate locale
 function LocaleGen() {
     local locale_name="${1}"
-    IFS='.' lang enc <<< "${locale_name}"
+    local lang="" enc=""
+    IFS=$'.' read -r lang enc <<< "${locale_name}"
     sudo localedef -i "${lang}" -f "${enc}"
     SetLocale "${locale_name}"
 }
@@ -1465,7 +1467,7 @@ function notify() {
     local -a args=("${@}")
     local application_name="custom_msg" msg="" notification_type=""
     local title=""
-    local -i time=1000
+    local -i time=3000
     local -a notification_type_group=( dialog-information system-error )
     notification_type="${notification_type_group[0]}"
     for ((i=0;i<${#args[@]};i++)); do

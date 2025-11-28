@@ -48,7 +48,8 @@ DBUS_SOCKET_ADDR="\${XDG_RUNTIME_DIR}/dbus-sway"
 
 pkill -u "\$(id -u)" -f "dbus-daemon --session .* --address=unix:path=\${DBUS_SOCKET_ADDR}" &
 wait \$!
-stat -c '%F' "\${DBUS_SOCKET_ADDR}" | grep socket 1> /dev/null 2>&1 || \\
+
+stat -c '%F' "\${DBUS_SOCKET_ADDR}" 1> /dev/null 2>&1 | grep socket 1> /dev/null 2>&1 || \\
     DBUS_SOCKET="\$(dbus-daemon --session --fork --nopidfile --print-address=1 --address=unix:path="\${DBUS_SOCKET_ADDR}")"
 
 DBUS_SESSION_BUS_ADDRESS="\${DBUS_SOCKET}"
@@ -119,7 +120,8 @@ DBUS_SOCKET_ADDR="\${XDG_RUNTIME_DIR}/dbus-Hyprland"
 
 pkill -u "\$(id -u)" -f "dbus-daemon --session .* --address=unix:path=\${DBUS_SOCKET_ADDR}" &
 wait \$!
-stat -c '%F' "\${DBUS_SOCKET_ADDR}" | grep socket 1> /dev/null 2>&1 || \\
+
+stat -c '%F' "\${DBUS_SOCKET_ADDR}" 1> /dev/null 2>&1 | grep socket 1> /dev/null 2>&1 || \\
     DBUS_SOCKET="\$(dbus-daemon --session --fork --nopidfile --print-address=1 --address=unix:path="\${DBUS_SOCKET_ADDR}")"
 
 DBUS_SESSION_BUS_ADDRESS="\${DBUS_SOCKET}"
