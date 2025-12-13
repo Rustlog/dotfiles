@@ -2,16 +2,17 @@
 
 # set -euo pipefail
 
-IFS=$'\n'
-RED="\033[38;2;244;10;10m"
-GREEN="\033[38;2;161;239;116m"
-WARN="\033[38;2;233;98;116m"
-BROWN="\033[38;2;240;120;120m"
-LIGHT_SKIN="\033[38;2;255;230;180m"
-MUDDY="\033[38;2;195;158;151m"
-GREY="\033[38;2;160;160;140m"
-BLUE="\033[38;2;150;134;255m"
-NC="\033[0m"
+IFS=$' \n'
+
+readonly RED="\033[38;2;244;10;10m" \
+    GREEN="\033[38;2;161;239;116m" \
+    WARN="\033[38;2;233;98;116m" \
+    BROWN="\033[38;2;240;120;120m" \
+    LIGHT_SKIN="\033[38;2;255;230;180m" \
+    MUDDY="\033[38;2;195;158;151m" \
+    GREY="\033[38;2;160;160;140m" \
+    BLUE="\033[38;2;150;134;255m" \
+    NC="\033[0m"
 
 declare -a  MPV_FLAGS=()
 declare -a SELECTED=() CURRENTLY_PLAYING=()
@@ -19,10 +20,7 @@ declare -a SELECTED=() CURRENTLY_PLAYING=()
 QUIET=0
 DETACH=0
 
-MUSIC_DIR="${HOME}/Music"
-
-trap 'Exit 0' SIGINT SIGQUIT
-trap 'Exit 1' SIGTERM
+readonly MUSIC_DIR="${HOME}/Media/Music"
 
 function LOG() {
     local type_="${1}"; shift
@@ -184,6 +182,9 @@ function main() {
                 ;;
         esac
     done
+
+    trap 'Exit 0' SIGINT SIGQUIT
+    trap 'Exit 1' SIGTERM
 
     [[ -d "${MUSIC_DIR}" ]] || {
         LOG error "Music directory not found: '${BLUE}${MUSIC_DIR}${NC}'"

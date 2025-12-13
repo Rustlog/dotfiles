@@ -5,7 +5,7 @@ builtin set -euo pipefail
 
 # Global readonly vars
 readonly THIS_SCRIPT_NAME="${0##*/}"
-readonly D_CONFIG_DIR="${XDG_CONFIG_HOME:-"$HOME/.config/custom"}/${THIS_SCRIPT_NAME}"
+readonly D_CONFIG_DIR="${XDG_CONFIG_HOME:-"$HOME/.config/custom"}/${THIS_SCRIPT_NAME,,}"
 
 # Global mutable vars
 F_CONFIG_FILE=""

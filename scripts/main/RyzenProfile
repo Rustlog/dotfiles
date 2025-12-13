@@ -1,54 +1,80 @@
 #!/usr/bin/env bash
 
-# RyzenProfile - Ryzen power profile daemon using ryzenajd
+# RyzenProfile - Ryzen power profile daemon using ryzenadj
 # Single file (this cli) installs Init service and daemon script
 #
 # Features:
 #   - Captures live OEM limits once at install
 #   - Generates 38-100% power profiles automatically from cached OEM limits
-#   - Hot switching profiles 'ryzenprofile -s -p powersave -a'
+#   - Automatically apply profile on AC<->BAT or manual switch
+#   - Manually Switch profile 'ryzenprofile -s -p powersave'
 #   - Summary of installed profiles 'ryzenprofile -l'
-#   - Live view of active and unmanaged workers 'ryzenprofile --show'
+#   - Live active and unmanaged workers 'ryzenprofile --show'
 #
-# Author: Rustlog
-# LICENSE: MIT
-# Homepage: https://github.com/rustlog/ryzenprofile
+# @Author: Rustlog
+# @Github: https://github.com/Rustlog/ryzenprofile
+# @Version: v1.0
+# @License: MIT
 #
 
 # Enable exit on error, unset var, or pipe fail
 builtin set -euo pipefail
 
-# Global defaults
-SCRIPT_NAME="$(readlink -f "${0}")"
-SCRIPT_NAME="${SCRIPT_NAME##*/}"
-CONFIG_DIR="/etc/${SCRIPT_NAME,,}"
-PROFILES_DIR="${CONFIG_DIR}/profiles"
-F_CONFIG_FILE="${CONFIG_DIR}/config"
-F_CURRENT_POWER_PROFILE="${CONFIG_DIR}/power_profile"
-F_STOCK_LIMITS="${CONFIG_DIR}/stock_limits"
+# Global readonly defaults
+SCRIPT_NAME="${0##*/}" \
+D_CONFIG_DIR="/etc/${SCRIPT_NAME,,}" \
+D_PROFILES_DIR="${D_CONFIG_DIR}/profiles" \
+F_CONFIG_FILE="${D_CONFIG_DIR}/config" \
+F_CURRENT_POWER_PROFILE="${D_CONFIG_DIR}/power_profile" \
+F_STOCK_LIMITS="${D_CONFIG_DIR}/stock_limits"
+
+readonly SCRIPT_NAME D_CONFIG_DIR \
+    D_PROFILES_DIR F_CONFIG_FILE \
+    F_CURRENT_POWER_PROFILE F_STOCK_LIMITS
+
+# global mutable vars
 RYZENADJ_PATH="$(command -v ryzenadj)"
 POWER_PROFILE="balanced"
 SERVICE_DIR=""
-POSIX_SCRIPT=""
 SERVICE_NAME=""
+POSIX_SCRIPT=""
 INIT_SYSTEM=""
 VERBOSE=0
+NO_COLOR=1
 
 # Pretty logger
 function log() {
-    local type_="${1}"; shift 1
-    case "${type_}" in
-        error)
-            printf '[%b]: %b\n' "${type_}" "${*}" 1>&2
-            return 1
-            ;;
-        warn|ex_info)
-            [[ $VERBOSE -eq 1 ]] && \
-                printf '[%b]: %b\n' "${type_}" "${*}"
-            return 0
-            ;;
+    local _type="${1}"; shift
+    local _color="" _t="" _exit_code=0
+    if [[ $NO_COLOR -eq 0 ]] && [[ -t 1 ]]; then
+        local -g _info_color="\033[38;2;85;255;126m" \
+            _warn_color="\033[38;2;255;170;10m" \
+            _error_color="\033[38;2;244;29;31m" \
+            _fatal_color="\033[5m\033[38;2;255;0;0m" \
+            _other_color="\033[38;2;251;255;208m" \
+            _nc="\033[0m"
+    else
+        _info_color="" _warn_color="" _error_color=""
+        _fatal_color="" _other_color="" _nc=""
+    fi
+    case "${_type}" in
+        info) _color="${_info_color:-}" _t="*"                ;;
+        warn) _color="${_warn_color:-}" _t="^"                ;;
+        error) _color="${_error_color:-}" _t="!" _exit_code=1 ;;
+        fatal) _color="${_fatal_color:-}" _t="#" _exit_code=1 ;;
+        *) _color="${_other_color-""}" _t=""                  ;;
     esac
-    printf '[%b]: %b\n' "${type_}" "${*}"
+
+    if [[ "${_type}" =~ ^(warn|ex_info)$ ]]; then
+        [[ $VERBOSE -eq 1 ]] && \
+            printf "[%b%s%b%s]: %s: %b\n" \
+                "${_color}" "${_type}" "${_nc}" "${_t}" "${FUNCNAME[1]}()" "${*}"
+        return $_exit_code
+    fi
+
+    printf "[%b%s%b%s]: %s: %b\n" \
+        "${_color}" "${_type}" "${_nc}" "${_t}" "${FUNCNAME[1]}()" "${*}"
+    return $_exit_code
 }
 
 # General overview of this script functionality
@@ -66,8 +92,9 @@ function Usage() {
         "  -l, --list                List available profiles and currently active profile" \
         "      --status              Show running workers" \
         "      --kill-stale          Kill stale workers" \
+        "      --custom-args=\"\"      Pass additional ryzenadj flags" \
         "  -g, --generate-profiles   Generate all profiles defined in CONFIG: '${F_CONFIG_FILE}'" \
-        "                            -> generated profiles written to '${PROFILES_DIR}/*'" \
+        "                            -> generated profiles written to '${D_PROFILES_DIR}/*'" \
         "                               (Will use live or cached stock limits)" \
         "  -n, --service-name=NAME   Service name (default: '${SCRIPT_NAME}')" \
         "  -s, --set                 Set a profile in (${F_CONFIG_FILE}), conjunction with -p" \
@@ -81,11 +108,13 @@ function Usage() {
         "  -h, --help                Show this help message" \
         "" \
         "Examples:" \
-        "  ${SCRIPT_NAME} -s -p performance              # Set profile to 'performance'" \
-        "  ${SCRIPT_NAME} -u                             # Uninstall service" \
-        "  ${SCRIPT_NAME} --init --install               # Install and configure in one command" \
+        "  ${SCRIPT_NAME} -s -p performance                    # Set profile to 'performance'" \
+        "  ${SCRIPT_NAME} --init --install                     # Install and configure in one command" \
+        "  ${SCRIPT_NAME} -u                                   # Uninstall service" \
+        "  # Set additional ryzenadj args for profile 'performance'" \
+        "  ${SCRIPT_NAME} -s -p performance  --custom-args=\"--max-performance\"" \
         "" \
-        "Available profiles (under '${PROFILES_DIR}/*'):" \
+        "Available profiles (under '${D_PROFILES_DIR}/*'):" \
         "   $(ListAvailableProfiles)" \
         ""
 
@@ -94,7 +123,7 @@ function Usage() {
 
 # HELPER function -- Variable is not empty
 function require_var() {
-    local var="${1:-""}" _type="${2:-""}" msg="${3:-""}"
+    local var="${1:-}" _type="${2:-}" msg="${3:-}"
     [[ -n "${var}" ]] && return 0
     [[ -n "${msg}" ]] && log "${_type}" "${msg}"
     return 1
@@ -102,7 +131,7 @@ function require_var() {
 
 # HELPER function -- Check file existance
 function require_file() {
-    local file="${1}" _type="${2:-""}" msg="${3:-""}"
+    local file="${1}" _type="${2:-}" msg="${3:-}"
     [[ -s "${file}" ]] && return 0
     [[ -n "${msg}" ]] && log "${_type}" "${msg}"
     return 1
@@ -110,7 +139,7 @@ function require_file() {
 
 # HELPER function -- Check directory existance
 function require_dir() {
-    local dir="${1}" _type="${2:-""}" msg="${3:-""}"
+    local dir="${1}" _type="${2:-}" msg="${3:-}"
     [[ -d "${dir}" ]] && return 0
     [[ -n "${msg}" ]] && log "${_type}" "${msg}"
     return 1
@@ -125,7 +154,7 @@ function is_flag_enabled() {
 
 # HELPER function -- Ensure directory exists
 function create_dir() {
-    local dir="${1}" name="${2:-"This"}" msg="${3:-""}"
+    local dir="${1}" name="${2:-This}" msg="${3:-}"
     [[ -n "${msg}" ]] && log info "${msg}"
     if ! require_dir "${dir}"; then
         log warn "${name} '${dir}' does not exist"
@@ -140,9 +169,9 @@ function create_dir() {
 # HELPER function -- Move src (file) to dest (file)
 # or install dest file with mode and perms
 function Install() {
-    local f_src_file="${1:-""}" f_dest_file="${2:-""}"
-    local owners="${3:-"root:root"}" mode="${4:-"644"}"
-    local info_msg="${5:-""}"
+    local f_src_file="${1:-}" f_dest_file="${2:-}"
+    local owners="${3:-root:root}" mode="${4:-644}"
+    local info_msg="${5:-}"
     require_var "${f_dest_file}" error \
         "Cannot procceed to install 'f_dest_file' var is empty"
     sudo mkdir -p "${f_dest_file%/*}"
@@ -170,7 +199,7 @@ function CheckDeps() {
 # Install POSIX daemon script
 function InstallPosixScript() {
     local install_path="${1}"
-    local mode="${3:-"0755"}"
+    local mode="${3:-0755}"
 
     # Install daemon script - NOW
     Install "" "${install_path}" "root:root" "${mode}" \
@@ -185,36 +214,58 @@ exec 2>&1
 
 make_worker() {
     script_name="\${1}"
-    mode="\${2:-"0755"}"
-    owners="\${3:-"root:root"}"
+    mode="\${2:-0755}"
+    owners="\${3:-root:root}"
     cat > "\${script_name}" << EOF__
 #!/bin/env sh
 
 PROFILE="\\\${0##*/}"
 PROFILE="\\\$(printf '%s\\\\n' "\\\$PROFILE" | grep -o "(.*)" | sed -e 's/[\\(\\)]//g')"
-PROFILE="\\\${PROFILE:-"powersave"}"
+PROFILE="\\\${PROFILE:-powersave}"
 
-PROFILES_DIR="${PROFILES_DIR}"
+D_PROFILES_DIR="${D_PROFILES_DIR}"
 
 # shellcheck disable=SC1090
-. "\\\${PROFILES_DIR}"/"\\\${PROFILE}"
+. "\\\${D_PROFILES_DIR}"/"\\\${PROFILE}"
 
-${RYZENADJ_PATH} \\\\
-        --stapm-limit="\\\${STAPM_LIMIT}" \\\\
-        --fast-limit="\\\${FAST_LIMIT}" \\\\
-        --slow-limit="\\\${SLOW_LIMIT}" \\\\
-        --apu-slow-limit="\\\${APU_SLOW_LIMIT}" \\\\
-        --vrm-current="\\\${VRM_CURRENT}" \\\\
-        --vrmmax-current="\\\${VRMMAX_CURRENT}" \\\\
-        --tctl-temp="\\\${TCTL_TEMP}" \\\\
-        --apu-skin-temp="\\\${APU_SKIN_TEMP}" \\\\
-        --dgpu-skin-temp="\\\${DGPU_SKIN_TEMP}"
+if [ -n "\\\${CUSTOM_ARGS}" ]; then
+    ${RYZENADJ_PATH} \\\\
+            --stapm-limit="\\\${STAPM_LIMIT}" \\\\
+            --fast-limit="\\\${FAST_LIMIT}" \\\\
+            --slow-limit="\\\${SLOW_LIMIT}" \\\\
+            --apu-slow-limit="\\\${APU_SLOW_LIMIT}" \\\\
+            --vrm-current="\\\${VRM_CURRENT}" \\\\
+            --vrmmax-current="\\\${VRMMAX_CURRENT}" \\\\
+            --tctl-temp="\\\${TCTL_TEMP}" \\\\
+            --apu-skin-temp="\\\${APU_SKIN_TEMP}" \\\\
+            --dgpu-skin-temp="\\\${DGPU_SKIN_TEMP}" \\\\
+            \\\${CUSTOM_ARGS:+ \\\${CUSTOM_ARGS}}
+else
+    ${RYZENADJ_PATH} \\\\
+            --stapm-limit="\\\${STAPM_LIMIT}" \\\\
+            --fast-limit="\\\${FAST_LIMIT}" \\\\
+            --slow-limit="\\\${SLOW_LIMIT}" \\\\
+            --apu-slow-limit="\\\${APU_SLOW_LIMIT}" \\\\
+            --vrm-current="\\\${VRM_CURRENT}" \\\\
+            --vrmmax-current="\\\${VRMMAX_CURRENT}" \\\\
+            --tctl-temp="\\\${TCTL_TEMP}" \\\\
+            --apu-skin-temp="\\\${APU_SKIN_TEMP}" \\\\
+            --dgpu-skin-temp="\\\${DGPU_SKIN_TEMP}"
+fi
 
 tail -f /dev/null || sleep 8000000000
 
 EOF__
     chown "\${owners}" "\${script_name}"
     chmod "\${mode}" "\${script_name}"
+}
+
+running_on() {
+    if [ "\${1}" = "1" ]; then
+        printf '%s\\n' "AC"
+    else
+        printf '%s\\n' "BAT"
+    fi
 }
 
 F_CONFIG_FILE="${F_CURRENT_POWER_PROFILE}"
@@ -255,16 +306,10 @@ while :; do
 
     # Log what's changed
     [ "\${NEW_POWER_STATE}" = "\${OLD_POWER_STATE}" ] || \\
-        printf '[info]: %s\\n' "Power source is changed"
+        printf '[info]: %s\\n' \\
+            "Power source changed: '\$(running_on "\$OLD_POWER_STATE")' -> '\$(running_on "\$NEW_POWER_STATE")'"
     [ "\${NEW_PROFILE}" = "\${OLD_PROFILE}" ] || \\
         printf '[info]: %s\\n' "Profile changed: '\${OLD_PROFILE}' -> '\${NEW_PROFILE}'"
-
-    # Log power source
-    if [ "\${NEW_POWER_STATE}" = "1" ]; then
-        printf '[info]: %s\\n' "Power source on AC"
-    else
-        printf '[info]: %s\\n' "Power source on BAT"
-    fi
 
     # If OLD WORKER WAS alive
     if [ -n "\${OLD_WORKER_PID}" ]; then
@@ -305,7 +350,7 @@ done
 EOF
 }
 
-# Fetch stock limits from system or pull from "${CONFIG_DIR}/stock_limits"
+# Fetch stock limits from system or pull from "${D_CONFIG_DIR}/stock_limits"
 function GetStockValues() {
     [[ -s "${F_STOCK_LIMITS}" ]] && \
         { cat "${F_STOCK_LIMITS}" | awk -F'=' '{ printf "%d\n", $2 }'; return 0; }
@@ -337,7 +382,7 @@ function GetStockValues() {
 
 # Profile generator
 function GenProfile() {
-    local percent="${1:-"60"}"
+    local percent="${1:-60}"
     local -i pretty_print="${2:-1}"
 
     mapfile -t LIMITS < <(GetStockValues)
@@ -356,7 +401,7 @@ function GenProfile() {
     factor="$(awk "BEGIN { printf \"%.2f\\n\", ${percent}/100 }")"
 
     calculate() {
-        local stock="${1}" cap="${2:-"8000"}"
+        local stock="${1}" cap="${2:-8000}"
         awk -v stock="${stock}" -v cap="${cap}" -v factor="${factor}" 'BEGIN {
             n = stock*factor
             if (n < cap) n = cap
@@ -375,8 +420,8 @@ function GenProfile() {
     }
 
     multiply_by() {
-        local value1="${1:-"1"}"
-        local value2="${2:-"1000"}"
+        local value1="${1:-1}"
+        local value2="${2:-1000}"
         awk -v v1="${value1}" -v v2="${value2}" 'BEGIN {
             printf "%d\n", v1*v2
         }'
@@ -388,9 +433,9 @@ function GenProfile() {
     new_apu_slow_limit="$(calculate "${apu_slow_limit}" "7")"
     new_vrm_current="$(calculate "${vrm_current}" "15")"
     new_vrmmax_current="$(calculate "${vrmmax_current}" "30")"
-    new_tctl_temp="$(calculate_temp "65" "${tctl_temp:-"100"}")"
-    new_apu_skin_temp=$(calculate_temp "30" "${apu_skin_temp:-"50"}")
-    new_dgpu_skin_temp=$(calculate_temp "40" "${dgpu_skin_temp:-"60"}")
+    new_tctl_temp="$(calculate_temp "65" "${tctl_temp:-100}")"
+    new_apu_skin_temp=$(calculate_temp "30" "${apu_skin_temp:-50}")
+    new_dgpu_skin_temp=$(calculate_temp "40" "${dgpu_skin_temp:-60}")
 
     if [[ $pretty_print -eq 1 ]]; then
         printf '%s = %d\n' \
@@ -406,7 +451,7 @@ function GenProfile() {
         return 0
     fi
 
-    printf '%s=%d\n' \
+    printf '%s="%d"\n' \
         "STAPM_LIMIT"     "$(multiply_by "${new_stapm_limit}" 1000)" \
         "FAST_LIMIT"      "$(multiply_by "${new_fast_limit}" 1000)" \
         "SLOW_LIMIT"      "$(multiply_by "${new_slow_limit}" 1000)" \
@@ -416,14 +461,14 @@ function GenProfile() {
         "TCTL_TEMP"       "${new_tctl_temp}" \
         "APU_SKIN_TEMP"   "${new_apu_skin_temp}" \
         "DGPU_SKIN_TEMP"  "${new_dgpu_skin_temp}"
-
+    printf '%s=""\n' "CUSTOM_ARGS"
 }
 
-# Generate profiles defined in "${CONFIG_DIR}/config"
+# Generate profiles defined in "${D_CONFIG_DIR}/config"
 function GenerateRyzenProfiles() {
     local profile_name="" percent="" tmp_file="" tmp=""
     local -i i=0
-    create_dir "${PROFILES_DIR}" "Directory" ""
+    create_dir "${D_PROFILES_DIR}" "Directory" ""
     # shellcheck disable=SC1090
     source "${F_CONFIG_FILE}"
     declare -p PROFILES &> /dev/null || \
@@ -446,23 +491,23 @@ function GenerateRyzenProfiles() {
         profile_name="${PROFILES[$i]}"
         percent="${PROFILES[$((i+1))]}"
         [[ $VERBOSE -eq 1 ]] && printf '    %s\n' \
-            "Installing profile: '${PROFILES_DIR}/${profile_name}' with '${percent}%' of stock limits"
+            "Installing profile: '${D_PROFILES_DIR}/${profile_name}' with '${percent}%' of stock limits"
         tmp="$(GenProfile "${percent}" 0)"
         tmp_file="$(mktemp)"
         printf '%s\n' "${tmp}" 1> "${tmp_file}"
-        Install "${tmp_file}" "${PROFILES_DIR}/${profile_name}" "root:root" "644" "" || \
-            log error "Failed to install profile '${PROFILES_DIR}/${profile_name}'"
+        Install "${tmp_file}" "${D_PROFILES_DIR}/${profile_name}" "root:root" "644" "" || \
+            log error "Failed to install profile '${D_PROFILES_DIR}/${profile_name}'"
         i=$((i+1))
     done
     log info "Generated $((i/2)) power profiles"
 }
 
-# List available profiles under "${CONFIG_DIR}/profiles/*"
+# List available profiles under "${D_CONFIG_DIR}/profiles/*"
 function ListAvailableProfiles() {
-    require_dir "${PROFILES_DIR}" "" "" || \
-        printf '%s\n' "Profiles are not installed in '${PROFILES_DIR}'"
+    require_dir "${D_PROFILES_DIR}" "" "" || \
+        printf '%s\n' "Profiles are not installed in '${D_PROFILES_DIR}'"
     local -a available_profiles=()
-    for profile in "${PROFILES_DIR}"/*; do
+    for profile in "${D_PROFILES_DIR}"/*; do
         [[ -f "${profile}" ]] || continue
         available_profiles+=("${profile##*/}")
     done
@@ -473,7 +518,7 @@ function ListAvailableProfiles() {
 # Summary of loaded profiles
 function ListProfiles() {
     require_file "${POSIX_SCRIPT}" error "Script '${POSIX_SCRIPT}' not installed" || true
-    printf '%s\n' "Available profiles (under '${PROFILES_DIR}/*'):"
+    printf '%s\n' "Available profiles (under '${D_PROFILES_DIR}/*'):"
     printf '  %s\n' "$(ListAvailableProfiles)"
     printf '%s\n' "Active config profile (in '${F_CURRENT_POWER_PROFILE}'):"
     printf '  %s\n' "$( \
@@ -507,12 +552,12 @@ function ShowActive() {
     pids="$(ps_pid)"
 
     [[ "${pids[0]}" == "no_pid" ]] && \
-        log error "Daemonic script not running '${POSIX_SCRIPT}'"
+        log error "Daemon script not running '${POSIX_SCRIPT}'"
 
     IFS=',' read -r -a pid_arr <<< "${pids}" || true
 
     printf '%s\n' \
-        "Running process (from 'grep -ao ${SERVICE_NAME} (.*) /proc/{$(ps_pid)}/cmdline' ):"
+        "Running process (from 'grep -ao ${SERVICE_NAME} (.*) /proc/{$(ps_pid)}/cmdline'):"
 
     for pid in "${pid_arr[@]}"; do
         profile_cmd_string="$( \
@@ -542,16 +587,16 @@ function KillStaleProcesses() {
     pids="$(ps_pid)"
 
     [[ "${pids[0]}" == "no_pid" ]] && \
-        log error "Daemonic script not running '${POSIX_SCRIPT}'"
+        log error "Daemon script not running '${POSIX_SCRIPT}'"
 
-    IFS=',' read -r -a pid_arr <<< "${pids}" || true
+    IFS=$',' read -r -a pid_arr <<< "${pids}" || true
 
     for pid in "${pid_arr[@]}"; do
         [[ "$(cut -d' ' -f4 /proc/"${pid}"/stat)" != "1" ]] && continue
         stale_pids+=("${pid}")
     done
 
-    [[ ${#stale_pids[@]} -lt 1 ]] && { log warn "No stale process found"; return 0; }
+    [[ ${#stale_pids[@]} -lt 1 ]] && { log info "No stale process found"; return 0; }
 
     for pid in "${stale_pids[@]}"; do
         if sudo kill -SIGTERM "${pid}"; then
@@ -600,8 +645,8 @@ PROFILES=(
 
 # If you don't like percent based profiles
 # You can copy one of the generated profile
-# save it with different name (e.g. ${PROFILES_DIR}/custom_profile)
-# then change the values (nvim ${PROFILES_DIR}/custom_profile)
+# save it with different name (e.g. ${D_PROFILES_DIR}/custom_profile)
+# then change the values (nvim ${D_PROFILES_DIR}/custom_profile)
 # apply your config using (${SCRIPT_NAME} -set -profile custom_profile)
 
 EOF
@@ -630,15 +675,32 @@ EOF
         "Successully created '${F_CURRENT_POWER_PROFILE}' with default power profile '(${POWER_PROFILE})'"
 }
 
-# Set profile in "${CONFIG_DIR}/current_profile"
-function SetProfile() {
+# Set profile in "${D_CONFIG_DIR}/current_profile"
+function SetNewProfile() {
     require_var "${POWER_PROFILE}" error "Power profile not set"
     [[ -s "${F_CURRENT_POWER_PROFILE}" ]] || WriteCurrentProfile
     if sudo sed -i "/^CURRENT_PROFILE=.*/c\CURRENT_PROFILE=${POWER_PROFILE}" \
         "${F_CURRENT_POWER_PROFILE}"; then
-        log info "Profile: '${POWER_PROFILE}' set in Config: '${F_CURRENT_POWER_PROFILE}'"
+        log info "Profile: '${POWER_PROFILE}' set in Config:" \
+            "'${F_CURRENT_POWER_PROFILE}'"
     else
-        log error "Failed to set '${POWER_PROFILE}' in '${F_CURRENT_POWER_PROFILE}'"
+        log error "Failed to set profile '${POWER_PROFILE}' in Config:" \
+            "'${F_CURRENT_POWER_PROFILE}'"
+    fi
+}
+
+# Set custom args in a given profile
+function SetCustomArgsInProfile() {
+    local custom_args="${1}"
+    [[ -s "${D_PROFILES_DIR}/${POWER_PROFILE}" ]] || \
+        log error "Profile doesn't exist '${POWER_PROFILE}'"
+    if sudo sed -i "/^CUSTOM_ARGS=.*/c\CUSTOM_ARGS=\"${custom_args}\"" \
+        "${D_PROFILES_DIR}/${POWER_PROFILE}"; then
+        log info "CUSTOM_ARGS: '${custom_args}' set in profile:" \
+            "'${D_PROFILES_DIR}/${POWER_PROFILE}'"
+    else
+        log error "Failed to set CUSTOM_ARGS '${custom_args}' in profile:" \
+            "'${D_PROFILES_DIR}/${POWER_PROFILE}'"
     fi
 }
 
@@ -737,7 +799,7 @@ function UninstallRunitService() {
     if [[ -d "${SERVICE_DIR}/${SERVICE_NAME}" ]]; then
         cd "${SERVICE_DIR}" || \
             log error "Cannot chdir to /etc/sv - aborting uninstall"
-        if sudo rm -r ./"${SERVICE_NAME:-""}"; then
+        if sudo rm -r ./"${SERVICE_NAME:-}"; then
             log info "Uninstalled '${SERVICE_NAME}' service"
         else
             log error "Failed to uninstall ${INIT_SYSTEM} service '${SERVICE_NAME}'"
@@ -749,7 +811,7 @@ function UninstallRunitService() {
     # Disable service (remove symlink)
     if [[ -L "${service_dir}/${SERVICE_NAME}" ]]; then
         cd "${service_dir}" || log error "Failed to enter '${service_dir}'"
-        if sudo rm -f ./"${SERVICE_NAME:-""}" 2> /dev/null; then
+        if sudo rm -f ./"${SERVICE_NAME:-}" 2> /dev/null; then
             log info "${INIT_SYSTEM^} service disabled at boot '${SERVICE_NAME}'"
         else
             log error "Failed to disable ${INIT_SYSTEM} service '${SERVICE_NAME}'"
@@ -877,7 +939,7 @@ function Check_SH() {
     local sh_shell=""
     command -v sh &> /dev/null && return 0
     create_symlink() {
-        local src="${1}" target="${2:-"/usr/bin/sh"}"
+        local src="${1}" target="${2:-/usr/bin/sh}"
         sudo mkdir -p "${target%/*}"
         sudo ln -svf "${src}" "${target}" || \
             log error "Failed to create symlink: '${src}' -> '${target}'"
@@ -893,52 +955,65 @@ function main() {
 
     local -a args=("${@}")
 
-    local -i uninstall=0 install=0 check_service=0 set_profile=0
-    local -i should_list_profiles=0 apply_profile=0
-    local -i show_usage=0 show_status=0 kill_stale_processes=0
-    local -i gen_profiles=0 should_init=0 verbose=0
+    local -i uninstall=0 install=0 check_service=0 set_enabled=0 \
+        should_list_profiles=0 apply_profile=0 show_usage=0 \
+            show_status=0 kill_stale_processes=0 gen_profiles=0 \
+                should_init=0 verbose=0 override_no_color=0 \
+                    override_color=0 p=0 a=0
 
-    local ryzenadj_path_override=""
+    local ryzenadj_path_override="" custom_args=""
     local service_name_override="" default_profile_override=""
+    local exceptions="--custom-args"
 
     # Argument parser
     local arg="" value=""
     for ((i=0;i<${#args[@]};i++)); do
         arg="${args[$i]}"
-        [[ -n "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
-            value="${args[$((i+1))]:-""}" i=$((i+1))
+        [[ -n "${args[$((i+1))]:-}" && "${args[$((i+1))]:-}" != -* ]] && \
+            value="${args[$((i+1))]:-}" i=$((i+1))
         if [[ "${arg}" == *=* ]]; then
             IFS=$'=' read -r arg value <<< "${arg}"
-            require_var "${value}" error "'${arg}' requires a value"
+            [[ ${arg} =~ ^(${exceptions})$ ]] || \
+                require_var "${value}" error "'${arg}' requires a value"
         fi
         case "${arg}" in
-            -a|--apply)          apply_profile=1                     ;;
-            -n|--service*)       service_name_override="${value}"    ;;
-            -s|--set)            set_profile=1                       ;;
-            -p|--profile)        default_profile_override="${value}" ;;
-            -l|--list*|-show*)   should_list_profiles=1              ;;
-            --status)            show_status=1                       ;;
-            --init)              should_init=1                       ;;
-            -k|--kill*stale)     kill_stale_processes=1              ;;
-            -r|--ryzenadj-path)  ryzenadj_path_override="${value}"   ;;
-            -g|--generate*)      gen_profiles=1                      ;;
-            -u|--uninstall)      uninstall=1                         ;;
-            -i|--install)        install=1                           ;;
-            -c|--check)          check_service=1                     ;;
-            -h|--help)           show_usage=1                        ;;
-            -v|--verbose)        verbose=1                           ;;
-            *) log error "Unknown option: '${arg}', use -help to see options" ;;
+            -a|--apply)          apply_profile=1                            ;;
+            -n|--service*)       service_name_override="${value}"           ;;
+            -s|--set)            set_enabled=1                              ;;
+            -p|--profile)        default_profile_override="${value}" p=1    ;;
+            -l|--list*|-show*)   should_list_profiles=1                     ;;
+            --status)            show_status=1                              ;;
+            --init)              should_init=1                              ;;
+            -k|--kill*stale)     kill_stale_processes=1                     ;;
+            -r|--ryzenadj-path)  ryzenadj_path_override="${value}"          ;;
+            -g|--generate*)      gen_profiles=1                             ;;
+            -u|--uninstall)      uninstall=1                                ;;
+            -i|--install)        install=1                                  ;;
+            -c|--check)          check_service=1                            ;;
+            -h|--help)           show_usage=1                               ;;
+            --custom-args)       custom_args="${value}" a=1                 ;;
+            -C|--no-color)       override_no_color=1                        ;;
+            --color)             override_color=1                        ;;
+            -v|--verbose)        verbose=1                                  ;;
+            *) log error "Unknown option: '${arg}', use --help to see options" ;;
         esac
     done
 
+    [[ -t 1 ]] && NO_COLOR=0
+
+    [[ ${#@} -eq 0 ]] && \
+        log error "Not sure what to do? use --help I'll tell you everything."
+
     # shellcheck disable=SC1090
-    source "${F_CONFIG_FILE:-""}"
+    source "${F_CONFIG_FILE:-}"
 
     # Overrides
     require_var "${ryzenadj_path_override}" && RYZENADJ_PATH="${ryzenadj_path_override}"
-    require_var "${CURRENT_PROFILE:-""}" && POWER_PROFILE="${CURRENT_PROFILE}"
+    require_var "${CURRENT_PROFILE:-}" && POWER_PROFILE="${CURRENT_PROFILE}"
     require_var "${default_profile_override}" && POWER_PROFILE="${default_profile_override}"
     require_var "${service_name_override}" && SERVICE_NAME="${service_name_override}"
+    is_flag_enabled "$override_no_color" && NO_COLOR=1
+    is_flag_enabled "$override_color" && NO_COLOR=0
     is_flag_enabled "$verbose" && VERBOSE=1
 
     # Init system detection
@@ -967,22 +1042,29 @@ function main() {
     Check_SH
 
     # Initial setup: if config directory does not exist
-    require_dir "${CONFIG_DIR:-""}" || InitialSetup "$should_init" "$show_usage"
+    require_dir "${D_CONFIG_DIR:-}" || InitialSetup "$should_init" "$show_usage"
 
     # Generate default config if it does not exist
-    require_file "${F_CONFIG_FILE:-""}" || WriteDefaultConfig
+    require_file "${F_CONFIG_FILE:-}" || WriteDefaultConfig
 
     # Fallback service name if no SERVICE_NAME found in config
-    require_var "${SERVICE_NAME:-""}" || SERVICE_NAME="${SCRIPT_NAME}"
+    require_var "${SERVICE_NAME:-}" || SERVICE_NAME="${SCRIPT_NAME}"
 
     # Write a current profile
-    require_file "${F_CURRENT_POWER_PROFILE:-""}" || WriteCurrentProfile
+    require_file "${F_CURRENT_POWER_PROFILE:-}" || WriteCurrentProfile
 
     # Generate profiles
-    require_dir "${PROFILES_DIR:-""}" || GenerateRyzenProfiles
+    require_dir "${D_PROFILES_DIR:-}" || GenerateRyzenProfiles
 
-    # Set profile
-    is_flag_enabled "$set_profile" && SetProfile
+    if is_flag_enabled "$set_enabled"; then
+        if (( p )) && (( a )); then
+            # Set custom args in profile
+            SetCustomArgsInProfile "${custom_args}"
+        elif (( p )); then
+            # Just Set profile
+            SetNewProfile
+        fi
+    fi
 
     # Dynamically generate profiles
     is_flag_enabled "$gen_profiles" && GenerateRyzenProfiles
