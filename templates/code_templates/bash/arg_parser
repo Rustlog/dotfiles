@@ -46,8 +46,9 @@ function parse_args() {
 
     local arg="" value=""
     for ((i=0;i<${#args[@]};i++)); do
-        arg="${args[$i]}"
-        [[ -n "${args[$((i+1))]:-""}" && "${args[$((i+1))]:-""}" != -* ]] && \
+        arg="${args[i]}"
+        [[ ( "$((${#args[@]} - i))" -ge 1 && -n "${args[$((i+1))]:-""}" ) && \
+            "${args[$((i+1))]:-""}" != -* ]] && \
             value="${args[$((i+1))]:-""}" i=$((i+1))
         if [[ "${arg}" == -* && "${arg}" == *=* ]]; then
             IFS=$'=' read -r arg value <<< "${arg}"

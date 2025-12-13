@@ -35,7 +35,7 @@ let mapleader = '\'
 
 " Open new tab, switch to next tab, and close current tab
 nnoremap <silent><leader>t :tabnew<CR>
-nnoremap <silent><leader>n :tabmove<CR>
+nnoremap <silent><leader>n :tabnext<CR>
 nnoremap <silent><leader>p :tabprevious<CR>
 nnoremap <silent><leader>q :tabclose<CR>
 
@@ -75,10 +75,10 @@ endfunction
 command! ToggleWrap :call ToggleWrap()
 
 " Run C++ code
-command! RunCpp w | execute '!gcc -x c++ -pedantic -std=c++20 -lstdc++ -fno-elide-constructors -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
+command! RunCpp w | execute '!clang -x c++ -pedantic -std=c++20 -lstdc++ -fno-elide-constructors -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . '; rm ' . shellescape(expand('%:p:r'))
 
 " Run C code
-command! RunC w | execute '!gcc -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
+command! RunC w | execute '!clang -x c -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
 
 " Abort the commit message
 command! GitAbort : !mv "%" "%.bak" | :q!
@@ -105,7 +105,7 @@ autocmd BufNewFile *.c call setline(1, [
 
 " C++ tmeplate
 autocmd BufNewFile *.cpp,*.cxx,*.cc,*.c++ call setline(1, [
-    \ '//usr/bin/env gcc -lstdc++ -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '//usr/bin/env gcc -x c++ -lstdc++ -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
     \ '',
     \ '# include <iostream>',
     \ '',
@@ -207,7 +207,6 @@ require("lazy").setup({
 
         -- Native lsp stack
         { "williamboman/mason.nvim", config = true                                                          },
-        { "williamboman/mason-lspconfig.nvim"                                                               },
         { "neovim/nvim-lspconfig"                                                                           },
 
         -- COMPLETION (Enter confirms)
@@ -237,40 +236,70 @@ require("lazy").setup({
         },
 
         -- Auto-install servers + keymaps
-        { "williamboman/mason-lspconfig.nvim", config = function()
-            require("mason-lspconfig").setup{
+        {
+            "williamboman/mason-lspconfig.nvim",
+            dependencies = {
+                "williamboman/mason.nvim",
+                "neovim/nvim-lspconfig",  -- Provides default configs
+            },
+            event = "InsertEnter",
+            config = function()
+            require("mason").setup()
+
+            -- Capabilities for nvim-cmp (extend LSP defaults)
+            local capabilities = require("cmp_nvim_lsp").default_capabilities()
+
+            require("mason-lspconfig").setup({
               ensure_installed = {
-                "lua_ls", "ts_ls", "pyright", "rust_analyzer",
-                "gopls", "bashls", "html", "cssls", "jsonls",
-                "clangd", "volar", "sqlls", "cmake",
+                -- "lua_ls", "ts_ls", "pyright", "rust_analyzer",
+                -- "gopls", "bashls", "html", "cssls", "jsonls",
+                -- "volar",
+                -- "sqlls", "cmake",
+                -- "clangd"
               },
               automatic_installation = true,
-            }
+              handlers = {
+                -- Default handler: Extend defaults with capabilities and enable
+                function(server_name)
+                  local config = vim.lsp.config[server_name] or {}
+                  vim.lsp.config[server_name] = vim.tbl_deep_extend(
+                    "force",
+                    config,
+                    {
+                      capabilities = vim.tbl_deep_extend("force", config.capabilities or {}, capabilities),
+                      on_init = config.on_init,
+                      on_attach = config.on_attach,
+                    }
+                  )
+                  vim.lsp.enable(server_name)
+                end,
+                -- Override for clangd with specific flags
+                ["clangd"] = function()
+                  local config = vim.lsp.config["clangd"] or {}
+                  vim.lsp.config["clangd"] = vim.tbl_deep_extend(
+                    "force",
+                    config,
+                    {
+                      default_config = {
+                        cmd = { "clangd", "--background-index", "--clang-tidy", "--header-insertion=iwyu" },
+                      },
+                      capabilities = vim.tbl_deep_extend("force", config.capabilities or {}, capabilities),
+                    }
+                  )
+                  vim.lsp.enable("clangd")
+                end,
+              },
+            })
 
-            local lspconfig = require("lspconfig")
-            local servers = {
-                "lua_ls", "ts_ls", "pyright", "rust_analyzer",
-                "gopls", "bashls", "html", "cssls", "jsonls",
-                "clangd", "volar", "sqlls", "cmake",
-                }
-            for _, server in ipairs(servers) do
-              lspconfig[server].setup{}
-            end
-
-            lsp.config.clangd.setup {
-                "clangd", "--background-index", "--clang-tidy", "--header-insertion=iwyu"
-            }
-
+            -- Global LSP keymaps (attached on LspAttach)
             vim.api.nvim_create_autocmd("LspAttach", {
               callback = function(ev)
-                local map = function(k, cmd, desc)
-                  vim.keymap.set("n", k, cmd, { buffer = ev.buf, desc = "LSP: " .. desc })
-                end
-                map("gd", vim.lsp.buf.definition, "Goto definition")
-                map("gr", vim.lsp.buf.references, "References")
-                map("K",  vim.lsp.buf.hover, "Hover")
-                map("<leader>rn", vim.lsp.buf.rename, "Rename")
-                map("<leader>ca", vim.lsp.buf.code_action, "Code action")
+                local opts = { buffer = ev.buf, silent = true }
+                vim.keymap.set("n", "gd", vim.lsp.buf.definition, vim.tbl_extend("force", opts, { desc = "Goto Definition" }))
+                vim.keymap.set("n", "gr", vim.lsp.buf.references, vim.tbl_extend("force", opts, { desc = "Goto References" }))
+                vim.keymap.set("n", "K", vim.lsp.buf.hover, vim.tbl_extend("force", opts, { desc = "Hover" }))
+                vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, vim.tbl_extend("force", opts, { desc = "Rename" }))
+                vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, vim.tbl_extend("force", opts, { desc = "Code Action" }))
               end,
             })
           end,
@@ -284,14 +313,14 @@ EOF
 
 " colorscheme gruvbox
 " colorscheme molokai
-colorscheme tokyonight-night
+colorscheme gruvbox
 
 " auto chmod logic
 autocmd BufWritePost *.sh,*.py if getline(1) =~ '^#!' | silent !chmod +x '%' | endif
 
 " Set colorscheme based on filetype
 augroup ColorSchemeSelector
-    autocmd FileType     sh,zsh,bash                colorscheme nightwolf-dark-gray
+    autocmd FileType     sh,zsh,bash                colorscheme slate
     autocmd FileType     c,cpp                      colorscheme tokyonight-moon
     autocmd FileType     iss                        colorscheme molokai
 augroup END

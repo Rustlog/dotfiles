@@ -75,7 +75,7 @@ set("content.blocking.hosts.lists", [
     "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext",
 ])
 
-set("content.canvas_reading", False)
+set("content.canvas_reading", True)
 
 # Set environment
 set("url.default_page",         "about:blank"    )

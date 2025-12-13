@@ -389,7 +389,7 @@ function Install_Zram() {
     log beautify "Installing zram swap runit service"
     tmpfile="$(mktemp)"
     if cat 1> "${tmpfile}" << EOF
-#!/usr/bin/sh
+#!/bin/sh
 
 ## Create zram swap at boot
 
@@ -612,6 +612,7 @@ function Install_dev_tools() {
     local -a XBPSPkgs=(
         # development tools
         base-devel
+        nasm patchelf
         libao libmpg123
         go zig gcc clang # compilers
         make cmake meson ninja premake5 # Build systems
