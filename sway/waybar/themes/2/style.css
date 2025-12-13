@@ -114,10 +114,8 @@ window#waybar {
 
 
 /* Common module styling with border-bottom */
-#language, #mode, #mpd, #custom-weather, #custom-playerctl, #clock, #cpu,
-#memory, #temperature, #battery, #network, #pulseaudio,
-#backlight, #disk, #custom-uptime, #custom-updates, #custom-quote,
-#idle_inhibitor, #tray {
+#language, #clock, #cpu, #memory, #temperature, #battery,
+#network, #pulseaudio, #backlight, #disk, #idle_inhibitor, #tray {
     padding: 0 10px;
     margin: 0 2px;
     border-bottom: 2px solid transparent;

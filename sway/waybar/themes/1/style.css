@@ -60,6 +60,17 @@
     margin: 0px 3px;
 }
 
+
+/* Common module styling with border-bottom */
+#language, #clock, #cpu, #memory, #temperature, #battery,
+#network, #pulseaudio, #backlight, #disk, #idle_inhibitor, #tray {
+    padding: 0 10px;
+    margin: 0 2px;
+    border-bottom: 2px solid transparent;
+    background-color: transparent;
+    margin: 0 0px;
+}
+
 /* ============= */
 /* Bar container */
 /* ============= */

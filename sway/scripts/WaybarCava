@@ -11,7 +11,7 @@ function log() {
     printf '[%s]: %b\n' "${type_}" "${*}" &>> "${work_dir}/waybar_.log"
 }
 
-function KILL_childs_processes() {
+function KILL_child_processes() {
     { pgrep -f ".*${0}" | grep -v "^$$" | xargs -r kill -SIGINT; } 2>/dev/null || true
     { pkill -f "cava -p ${work_dir}/cava_visualizer_X_.*.fifo.*"; } 2>/dev/null || true
 }
@@ -136,7 +136,7 @@ function ToggleBar() {
     pkill -f "cava -p ${config_file_ref}" || { log error "Failed to kill cava"; return 1; }
     cava -p "${config_file_ref}" &
     ## we don't need configuration now
-    (sleep 0.4 && rm -f "${config_file_ref}")
+    (sleep 0.8 && rm -f "${config_file_ref}")
 }
 
 function main() {
@@ -181,7 +181,7 @@ function main() {
 
     mkdir -p "${work_dir}"
 
-    KILL_childs_processes
+    KILL_child_processes
 
     ## set the bars
     SetBar bar cava_bar noise_level dict $use_bar_num $bar_len
@@ -205,7 +205,7 @@ function main() {
     pids+=($!)
 
     ## we don't need configuration now
-    (sleep 0.4 && rm -f "${config_file}")
+    (sleep 0.8 && rm -f "${config_file}")
 
     # when your are done just clean the mess
     trap "CleanUP ${pipe} ${config_file} pids; exit" EXIT SIGINT SIGTERM

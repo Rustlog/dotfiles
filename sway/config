@@ -143,7 +143,7 @@ bar {
     }
 
     # Set default volume, mute mic and brightness
-    exec bash -c ' \
+    exec sh -c ' \
         sleep 1; pactl set-sink-volume @DEFAULT_SINK@ 64%; \
         pactl set-sink-mute @DEFAULT_SINK@ false; \
         pactl set-source-volume @DEFAULT_SOURCE@ 0%; \
@@ -157,9 +157,9 @@ bar {
             before-sleep "${HOME}/.config/sway/lock_screen/lock.sh set_bg"
 
     # Start foot server
-    exec_always bash -c ' \
-        sock="${XDG_RUNTIME_DIR}/foot${WAYLAND_DISPLAY/#/-}.sock"; \
-        [[ -S "${sock}" ]] && exit 0; \
+    exec_always sh -c ' \
+        sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/foot-${WAYLAND_DISPLAY:-wayland-1}.sock"; \
+        { [ -S "${sock}" ] && exit 0; } || true; \
         foot --server=${sock} & \
     '
 
@@ -215,18 +215,20 @@ bar {
         bindsym $mod+Shift+E exec swaymsg exit
 
     #* Rotate Display clockwise *
-        bindsym Alt+Tab exec bash -c ' \
-                current="$(swaymsg --raw --type get_outputs | jq -r \".[].transform\")"; \
-                [[ "${current}" == "normal" ]] && current=0; \
-                [[ "${current}" == "270" ]] && current=0 || current=$(( current + 90 )); \
-                swaymsg output "*" transform "${current}" \
+        bindsym Alt+Tab exec sh -c ' \
+                CURRENT_TRANSFORM="$(swaymsg --raw --type get_outputs | jq -r \".[].transform\")"; \
+                [ "${CURRENT_TRANSFORM}" = "normal" ] && CURRENT_TRANSFORM=0; \
+                { [ "${CURRENT_TRANSFORM}" = "270" ] && CURRENT_TRANSFORM=0; } || \
+                    CURRENT_TRANSFORM=$(( CURRENT_TRANSFORM + 90 )); \
+                swaymsg output "*" transform "${CURRENT_TRANSFORM}" \
         '
     #* Rotate Display counter-clockwise *
-        bindsym Alt+Shift+Tab exec bash -c ' \
-                current="$(swaymsg --raw --type get_outputs | jq -r \".[].transform\")"; \
-                [[ "${current}" == "normal" ]] && current=0; \
-                [[ "${current}" == "0" ]] && current=270 || current=$(( current - 90 )); \
-                swaymsg output "*" transform "${current}" \
+        bindsym Alt+Shift+Tab exec sh -c ' \
+                CURRENT_TRANSFORM="$(swaymsg --raw --type get_outputs | jq -r \".[].transform\")"; \
+                [ "${CURRENT_TRANSFORM}" = "normal" ] && CURRENT_TRANSFORM=0; \
+                { [ "${CURRENT_TRANSFORM}" = "0" ] && CURRENT_TRANSFORM=270; } || \
+                    CURRENT_TRANSFORM=$(( CURRENT_TRANSFORM - 90 )); \
+                swaymsg output "*" transform "${CURRENT_TRANSFORM}" \
         '
     #* Reset Display to default view (horizontal) *
         bindsym $mod+0 exec swaymsg output '*' transform 0
@@ -249,7 +251,7 @@ bar {
 
     #* Cycle next workspace *#
         # Focus the next window (one-directional)
-        bindsym $mod+Tab exec bash -c ' \
+        bindsym $mod+Tab exec sh -c ' \
             swaymsg focus right || \
             swaymsg focus down  || \
             swaymsg focus up    || \
@@ -257,7 +259,7 @@ bar {
             swaymsg workspace next \
         '
         # Focus the previous window (one-directional)
-        bindsym $mod+Shift+Tab exec bash -c ' \
+        bindsym $mod+Shift+Tab exec sh -c ' \
             swaymsg focus left  || \
             swaymsg focus up    || \
             swaymsg focus down  || \
@@ -295,40 +297,48 @@ bar {
 
     # Audio-Video controls (playerctl)
         # Play-pause
-            bindsym $mod+Up   exec playerctl play-pause
+            bindsym --locked $mod+Up   exec playerctl play-pause
 
         # Mute sink (output)
-            bindsym $mod+Down exec pactl set-sink-mute @DEFAULT_SINK@ toggle
+            bindsym --locked $mod+Down exec pactl set-sink-mute @DEFAULT_SINK@ toggle
 
         # Seek backward
-            bindsym $mod+Ctrl+Left  exec playerctl position $( awk '{ print $1 - (5)  }' <<< $(playerctl position) )
-            bindsym $mod+Left       exec playerctl position $( awk '{ print $1 - (10) }' <<< $(playerctl position) )
-            bindsym $mod+Shift+Left exec playerctl position $( awk '{ print $1 - (40) }' <<< $(playerctl position) )
+            bindsym --locked $mod+Ctrl+Left  exec playerctl position \
+                $( printf '%s' $(playerctl position) | awk '{ print $1 - (5)  }' )
+            bindsym --locked $mod+Left       exec playerctl position \
+                $( printf '%s' $(playerctl position) | awk '{ print $1 - (10) }' )
+            bindsym --locked $mod+Shift+Left exec playerctl position \
+                $( printf '%s' $(playerctl position) | awk '{ print $1 - (40) }' )
 
         # Seek forward
-            bindsym $mod+Ctrl+Right  exec playerctl position $( awk '{ print $1 + (5)  }' <<< $(playerctl position) )
-            bindsym $mod+Right       exec playerctl position $( awk '{ print $1 + (10) }' <<< $(playerctl position) )
-            bindsym $mod+Shift+Right exec playerctl position $( awk '{ print $1 + (40) }' <<< $(playerctl position) )
+            bindsym --locked $mod+Ctrl+Right  exec playerctl position \
+                $( printf '%s' $(playerctl position) | awk '{ print $1 + (5)  }' )
+            bindsym --locked $mod+Right       exec playerctl position \
+                $( printf '%s' $(playerctl position) | awk '{ print $1 + (10) }' )
+            bindsym --locked $mod+Shift+Right exec playerctl position \
+                $( printf '%s' $(playerctl position) | awk '{ print $1 + (40) }' )
 
         # Volume controls
             # Volume up
-            bindsym $mod+Ctrl+Up   exec playerctl volume $( awk '{ print $1 + 1/20 }' <<< $(playerctl volume) )
+            bindsym --locked $mod+Ctrl+Up   exec playerctl volume \
+                $( printf '%s' $(playerctl volume) | awk '{ print $1 + 1/20 }' )
             # Volume down
-            bindsym $mod+Ctrl+Down exec playerctl volume $( awk '{ print $1 - 1/20 }' <<< $(playerctl volume) )
+            bindsym --locked $mod+Ctrl+Down exec playerctl volume \
+                $( printf '%s' $(playerctl volume) | awk '{ print $1 - 1/20 }' )
 
         # Play previous
-            bindsym $mod+Shift+Up exec playerctl previous
+            bindsym --locked $mod+Shift+Down exec playerctl previous
 
         # Play next
-            bindsym $mod+Shift+Down exec playerctl next
+            bindsym --locked $mod+Shift+Up exec playerctl next
 
-    #* Gestures in sway *#
+    #* Gestures *#
 
-    # bindgesture swipe:3:right exec bash -c " \
+    # bindgesture swipe:3:right exec sh -c " \
     #     swaymsg workspace \
     #     $(( $(swaymsg --raw --type get_workspaces | jq -r '.[] | select(.focused).name') - 1 )) \
     # "
-    # bindgesture swipe:3:left exec bash -c " \
+    # bindgesture swipe:3:left exec sh -c " \
     #     swaymsg workspace \
     #     $(( $(swaymsg --raw --type get_workspaces | jq -r '.[] | select(.focused).name') + 1 )) \
     # "
@@ -339,11 +349,11 @@ bar {
     bindgesture swipe:4:up move scratchpad
     bindgesture swipe:4:down scratchpad show
 
-    bindgesture pinch:3:inward exec bash -c ' \
+    bindgesture pinch:3:inward exec sh -c ' \
         swaymsg resize shrink height 20; \
         swaymsg resize shrink width 20 \
     '
-    bindgesture pinch:3:outward exec bash -c ' \
+    bindgesture pinch:3:outward exec sh -c ' \
         swaymsg resize grow height 20; \
         swaymsg resize grow width 20 \
     '
@@ -369,8 +379,8 @@ bar {
         }
 
     #* Resizing containers *#
-        bindsym $mod+r mode resize
-        mode resize {
+        bindsym $mod+r mode "resize"
+        mode "resize" {
             bindsym $left   resize shrink width 14px
             bindsym $right  resize grow width 14px
             bindsym $up     resize shrink height 14px
@@ -429,11 +439,11 @@ bar {
         # Browser 1
             bindsym $mod+F2 exec find ~/.bin/ -name Browser -exec {} 2 ";"
         # Browser 2
-            bindsym $mod+F3 exec find ~/.bin/ -name Browser -exec {} 3  ";"
+            bindsym $mod+F3 exec find ~/.bin/ -name Browser -exec {} 3 ";"
         # Browser 4
-            bindsym $mod+F4 exec find ~/.bin/ -name Browser -exec {} 4  ";"
+            bindsym $mod+F4 exec find ~/.bin/ -name Browser -exec {} 4 ";"
         # Browser 5
-            bindsym $mod+F5 exec find ~/.bin/ -name Browser -exec {} 5  ";"
+            bindsym $mod+F5 exec find ~/.bin/ -name Browser -exec {} 5 ";"
 
         # Bring my Text-fu terminal
             bindsym $mod+Return exec footclient
@@ -458,7 +468,7 @@ bar {
         #$ Screen Recording $#
             # Start recording fullscreen! (Mod+Alt+V)
                 bindsym $mod+Alt+V exec bash -c ' \
-                    DIR="${HOME}/media/WF_Recorder"; \
+                    DIR="${HOME}/Media/Videos/wf-recorder"; \
                     if [[ ! -d "${DIR}" ]]; then \
                         mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null; \
                     else \
@@ -467,18 +477,18 @@ bar {
                             "--pixel-format=yuv420p" \
                             "--framerate=60" \
                             "--audio=$(pactl get-default-sink).monitor" \
-                            "--file=${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv" \
+                            "--file=${DIR}/$(date +rec_%F_%T.mkv)" \
                         ); \
                     fi; \
                     notify-send -t 1000 "Screen recording started (fullscreen)"; \
                     if ! wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast; then \
                         wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast; \
                     fi \
-                ' &>> '/tmp/sway_fullscreen_recording.log'
+                '
 
             # Start recording on selected ratio of the screen (Mod+Shift+V)
                 bindsym $mod+Shift+V exec bash -c ' \
-                    DIR="${HOME}/media/WF_Recorder"; \
+                    DIR="${HOME}/Media/Videos/wf-recorder"; \
                     if [[ ! -d "${DIR}" ]]; then \
                         mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null; \
                     else \
@@ -488,53 +498,55 @@ bar {
                             "--framerate=60" \
                             "--audio=$(pactl get-default-sink).monitor" \
                             "--geometry=$(slurp -b aaccbb11)" \
-                            "--file=${DIR}/Rec_$(date +%d-%b-%Y_%H:%M:%S).mkv" \
+                            "--file=${DIR}/$(date +rec_%F_%T.mkv)" \
                         ); \
                     fi; \
                     notify-send -t 1000 "Screen recording started (${flags[3]##*=})"; \
                     if ! wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast; then \
                         wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast; \
                     fi \
-                ' &>> '/tmp/sway_selected_screen_recording.log'
+                '
 
             # Stop recording send INT sig to the recorder (Mod+Alt+C)
-                bindsym $mod+Alt+C exec bash -c ' \
+                bindsym $mod+Alt+C exec sh -c ' \
                     notify-send -t 3000 "Recording Stopped"; \
-                    kill -INT $(pidof wf-recorder) \
+                    kill -INT "$(pidof wf-recorder)" \
                 '
 
         #$ Screenshot $#
             # Take screenshot of fullscreen! (Mod+PrtSc)
-                bindsym $mod+Print exec bash -c ' \
-                   DIR="${HOME}/media/Grim_Screenshots"; \
-                   [[ -d "${DIR}" ]] || mkdir -p "${DIR}"; \
-                   grim "${DIR}/$(date +%d-%b-%Y_%T).png" \
+                bindsym $mod+Print exec sh -c ' \
+                    DIR="${HOME}/Media/Pictures/grim"; \
+                    [ -d "${DIR}" ] || mkdir -p "${DIR}"; \
+                    OUTPUT="${DIR}/$(date +"%F_%T:$(printf "%d\n" "$(date +%N)" | cut -b1-2)").png"; \
+                    grim -t png -l 0 "${OUTPUT}" \
                 '
             # Screenshot of selected area (Mod+Shift+S)
-                bindsym $mod+Shift+S exec bash -c ' \
-                    DIR="${HOME}/media/Grim_Screenshots"; \
-                    [[ -d "${DIR}" ]] || mkdir -p "${DIR}"; \
-                    grim -g "$(slurp -b aaccbb11)" "${DIR}/$(date +%d-%b-%Y_%T).png" \
+                bindsym $mod+Shift+S exec sh -c ' \
+                    DIR="${HOME}/Media/Pictures/grim"; \
+                    [ -d "${DIR}" ] || mkdir -p "${DIR}"; \
+                    OUTPUT="${DIR}/$(date +"%F_%T:$(printf "%d\n" "$(date +%N)" | cut -b1-2)").png"; \
+                    grim -g "$(slurp -b aaccbb11)" -t png -l 0 "${OUTPUT}" \
                 '
 
         # Edit this (sway config) with neovim or vim
-            bindsym $mod+I exec foot --app-id=solid bash -c ' \
-                conf=${HOME}/.config/sway/config; \
-                nvim ${conf} \
+            bindsym $mod+I exec foot --app-id=solid sh -c ' \
+                CONF=${HOME}/.config/sway/config; \
+                nvim ${CONF} \
             '
 
         # Shutdown (Mod+Alt+Shift+P)
-            bindsym $mod+Alt+Shift+P exec bash -c ' \
+            bindsym $mod+Alt+Shift+P exec sh -c ' \
                 notify-send "Shutting down...!"; \
                 sleep 2 && systemctl poweroff --now || loginctl poweroff \
             '
         # Reboot/Restart ($mod+Alt+Shift+R)
-            bindsym $mod+Alt+Shift+R exec bash -c ' \
+            bindsym $mod+Alt+Shift+R exec sh -c ' \
                 notify-send "REBOOTING...!"; \
                 sleep 2 && systemctl reboot --now  || loginctl reboot \
             '
         # Sleep (Mod+Alt+Shift+delete)
-            bindsym $mod+Alt+Shift+delete exec bash -c ' \
+            bindsym $mod+Alt+Shift+delete exec sh -c ' \
                 notify-send "I need some Rest"; \
                 sleep 2 && systemctl suspend --now || loginctl suspend \
             '
@@ -551,49 +563,48 @@ bar {
             bindsym $mod+Alt+S      exec systemctl hybrid-sleep --now
 
         # Grab selected screen resolution? (Mod+Shift+G)
-            bindsym $mod+Shift+G  exec bash -c ' \
-                res="$(slurp -b aaccbb11)"; \
-                notify-send -t 8000 "${res}"; \
-                wl-copy "${res}"\
+            bindsym $mod+Shift+G  exec sh -c ' \
+                RES="$(slurp -b aaccbb11)"; \
+                notify-send -t 8000 "${RES}"; \
+                wl-copy "${RES}"\
             '
 
         # List of Emojies in rofi-emoji (Mod+backslash+E)
             bindsym $mod+grave+V exec rofi -modi emoji -show emoji
 
         # Select and set wallaper
-        bindsym $mod+Space+W exec foot --app-id=floating -w 1200x600 bash -c ' \
-            dir="${HOME}/.local/share/wallpapers"; \
-            cd "${dir}"; \
-            selected="$(fzf --preview-window right:80% --preview="chafa --size=60x30 --animate=off {}")"; \
-            swww img "${dir}/${selected}" --transition-type fade --transition-duration 1; \
+        bindsym $mod+Space+W exec foot --app-id=floating -w 1200x600 sh -c ' \
+            DIR="${HOME}/.local/share/wallpapers"; \
+            cd "${DIR}"; \
+            SELECTED="$(fzf --preview-window right:80% --preview="chafa --size=60x30 --animate=off {}")"; \
+            swww img "${DIR}/${SELECTED}" --transition-type fade --transition-duration 1; \
         '
 
         # Temporary thought dumping
-            bindsym $mod+grave+T exec foot bash -c ' \
+            bindsym $mod+grave+T exec foot sh -c ' \
                 temp_edit_file="$(mktemp -t temp_edit.XXXX)"; \
-                trap "rm -f \${temp_edit_file}" EXIT SIGKILL SIGINT; \
-                command -v nvim &> /dev/null && EDITOR="nvim"; \
-                ${EDITOR:-vim} "${temp_edit_file}"; wl-copy < "${temp_edit_file}"; \
+                trap "rm -f \${temp_edit_file}" EXIT KILL INT; \
+                command -v nvim 1> /dev/null 2>&1 && EDITOR="nvim"; \
+                "${EDITOR:-vim}" "${temp_edit_file}"; wl-copy < "${temp_edit_file}"; \
                 rm -f "${temp_edit_file}" \
             '
 
     #* System monitors *#
         # htop
-        bindsym Ctrl+Shift+Escape exec foot bash -c ' \
+        bindsym Ctrl+Shift+Escape exec foot sh -c ' \
             htop || btop \
         '
 
         # btop
-        bindsym Ctrl+Escape exec foot bash -c ' \
+        bindsym Ctrl+Escape exec foot sh -c ' \
             btop || htop \
         '
 
         # Plasma system monitor
-        bindsym $mod+Escape exec bash -c ' \
+        bindsym $mod+Escape exec sh -c ' \
             if ! env XDG_CURRENT_DESKTOP=KDE \
-                GTK_THEME=Adwaita:dark \
-                plasma-systemmonitor; then \
-                foot htop || sudo pacman -Sy htop --noconfirm \
+                GTK_THEME=Adwaita:dark plasma-systemmonitor; then \
+                foot htop; \
             fi \
         '
 
@@ -611,7 +622,7 @@ bar {
             bindsym $mod+O exec $(find ~/.bin/ -type f -name CavaInstances) clean
 
         # Journal time
-            bindsym $mod+grave+J exec foot --app-id=journal bash -c ' \
+            bindsym $mod+grave+J exec foot --app-id=journal sh -c ' \
                 ~/.bin/main/JournalToday edit; \
             '
 
