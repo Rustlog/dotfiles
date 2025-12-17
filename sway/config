@@ -144,8 +144,8 @@ bar {
 
     # Set default volume, mute mic and brightness
     exec sh -c ' \
-        sleep 1; pactl set-sink-volume @DEFAULT_SINK@ 64%; \
-        pactl set-sink-mute @DEFAULT_SINK@ false; \
+        sleep 1; $($((pactl get-sink-volume @DEFAULT_SINK@)) > 100) && \
+        pactl set-sink-volume @DEFAULT_SINK@ 64%; \
         pactl set-source-volume @DEFAULT_SOURCE@ 0%; \
         pactl set-source-mute @DEFAULT_SOURCE@ true; \
         brightnessctl set 34% \
@@ -622,9 +622,7 @@ bar {
             bindsym $mod+O exec $(find ~/.bin/ -type f -name CavaInstances) clean
 
         # Journal time
-            bindsym $mod+grave+J exec foot --app-id=journal sh -c ' \
-                ~/.bin/main/JournalToday edit; \
-            '
+            bindsym $mod+grave+J exec foot --app-id=journal ~/.bin/main/JournalToday -e
 
 
 ### Additional configuration

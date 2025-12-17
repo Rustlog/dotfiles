@@ -768,11 +768,12 @@ function Install_utils() {
     local -a XBPSPkgs=(
         zip brightnessctl dust gdu tree procs firejail
         tmux rsync dnsmasq hostapd polkit elogind nftables
-        zsh zsh-syntax-highlighting openvpn zbar cronie
+        zsh zsh-syntax-highlighting openvpn zbar cronie zstd
         bat eza fzf jq lesspipe lsd micro ncdu neovim nodejs ripgrep
         fuse-sshfs lsof rsyslog plymouth man-db mlocate ngetty
         xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
-        chafa numactl fbterm
+        chafa numactl fbterm frp cryptsetup
+        man-pages-devel man-pages-posix # docs for C and POSIX
         libwebp-tools # cwewp
         ImageMagic NetworkManager network-manager-applet # Network Manager
         wireless_tools # for iwlist

@@ -21,7 +21,7 @@ function BuildConfig() {
     local config_file="${1}"
     local pipe="${2}"
     local bar_="${3}"
-    local cava_bar="${4}"
+    local idle_cava_bar="${4}"
     local -i noise_level=${5}
     local -i framerate=${6}
 
@@ -31,7 +31,7 @@ if ! cat 1> "${config_file}" << EOF
 # Automatically generate config by process '${0}'
 
 [general]
-bars = ${#cava_bar}
+bars = ${#idle_cava_bar}
 framerate = $framerate
 
 [input]
@@ -86,7 +86,7 @@ function CleanUP() {
 # bar characters (represents visualizer levels)
 function SetBar() {
     local -n bar_ref=${1}
-    local -n cava_bar_ref=${2}
+    local -n idle_cava_bar_ref=${2}
     local -n noise_level_ref=${3}
     local -n dict_ref=${4}
     local -i use_bar_num=${5:-1}
@@ -100,9 +100,9 @@ function SetBar() {
     esac
 
     # create an idle bar `________` when nothing is playing
-    cava_bar_ref=""
+    idle_cava_bar_ref=""
     for i in $(seq 1 $((bar_len*2))); do
-        cava_bar_ref+="${bar_ref:0:1}"
+        idle_cava_bar_ref+="${bar_ref:0:1}"
     done
 
     # create dictionary to with key (numbers) value (corresponding glyph character) pair for `sed`
@@ -115,7 +115,7 @@ function SetBar() {
 # restart cava with next bar when script recieves SIGUSR1 signal
 function ToggleBar() {
     local -n bar_ref_=${1}
-    local -n cava_bar_ref_=${2}
+    local -n idle_cava_bar_ref_=${2}
     local -n noise_level_ref_=${3}
     local -n dict_ref_=${4}
     local -n use_bar_num_ref=${5}
@@ -127,10 +127,10 @@ function ToggleBar() {
     use_bar_num_ref=$(( (use_bar_num_ref % 4) + 1 ))
 
     ## set the bars
-    SetBar bar cava_bar noise_level dict "$use_bar_num" "$bar_len_ref"
+    SetBar bar idle_cava_bar noise_level dict "$use_bar_num" "$bar_len_ref"
 
     ## create fresh new the config
-    BuildConfig "${config_file_ref}" "${pipe_ref}" "${bar}" "${cava_bar}" "$noise_level" "$framerate_ref"
+    BuildConfig "${config_file_ref}" "${pipe_ref}" "${bar}" "${idle_cava_bar}" "$noise_level" "$framerate_ref"
 
     ## re-start cava
     pkill -f "cava -p ${config_file_ref}" || { log error "Failed to kill cava"; return 1; }
@@ -151,7 +151,7 @@ function main() {
     # output Pipe
     local pipe="${tmp}"
     # ASCII characters
-    local cava_bar=""
+    local idle_cava_bar=""
     # glyph characters
     local dict="s@;@@g"
     # actual bar glyph characters
@@ -184,10 +184,10 @@ function main() {
     KILL_child_processes
 
     ## set the bars
-    SetBar bar cava_bar noise_level dict $use_bar_num $bar_len
+    SetBar bar idle_cava_bar noise_level dict $use_bar_num $bar_len
 
     ## create the config
-    BuildConfig "${config_file}" "${pipe}" "${bar}" "${cava_bar}" "$noise_level" "$framerate"
+    BuildConfig "${config_file}" "${pipe}" "${bar}" "${idle_cava_bar}" "$noise_level" "$framerate"
 
     log info "bar num: ${use_bar_num}"
     log info "framerate: ${framerate}"
@@ -210,20 +210,15 @@ function main() {
     # when your are done just clean the mess
     trap "CleanUP ${pipe} ${config_file} pids; exit" EXIT SIGINT SIGTERM
     # trap SIGUSR1 to toggle next bar
-    trap 'ToggleBar bar cava_bar noise_level dict use_bar_num config_file pipe bar_len framerate' SIGUSR1
+    trap 'ToggleBar bar idle_cava_bar noise_level dict use_bar_num config_file pipe bar_len framerate' SIGUSR1
 
     ## read stdout from cava, transform output, and check for activity
     local visualizer_output=""
     while read -r line < "${pipe}" || true; do
         visualizer_output=$(printf '%s\n' "${line}" | sed -u "${dict}")
-        # detect if there's any visualizer activity (i.e., non-empty output)
-        if [[ -n "${visualizer_output}" && "${visualizer_output}" != "${cava_bar}" ]]; then
-            # JSON output with a class to enable dynamic output
-            printf '%s\n' "{\"text\": \"${visualizer_output}\", \"class\": \"active\"}"
-        else
-            # JSON output with a class indicating idle state
-            printf '%s\n' "{\"text\": \"${visualizer_output}\", \"class\": \"inactive\"}"
-        fi
+        state=active
+        [[ "${visualizer_output}" == "${idle_cava_bar}" ]] && state=inactive
+        printf '%s\n' "{\"text\":\"${visualizer_output}\",\"class\":\"${state}\"}"
     done
 }
 

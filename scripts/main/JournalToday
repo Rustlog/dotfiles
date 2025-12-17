@@ -24,8 +24,8 @@ function log() {
     esac
     case "${_type}" in
         debug) [[ $VERBOSE -eq 0 ]] || \
-            printf "[%b%s%b]: %b\n" "${_color}" "${_type}${mark}" "${NC}" "${*}" ;;
-        *) printf "[%b%s%b]: %b\n" "${_color}" "${_type}${mark}" "${NC}" "${*}" ;;
+            printf "[%b%s%b]: %b\n" "${_color}" "${_type}${mark}" "${NC}" "${*//$HOME/\~}" ;;
+        *) printf "[%b%s%b]: %b\n" "${_color}" "${_type}${mark}" "${NC}" "${*//$HOME/\~}" ;;
     esac
 }
 
@@ -212,7 +212,7 @@ function EditTemplate() {
 
     log info "Edit template: $(ColorPath "${TEMPLATE_FILE}")"
     cp "${TEMPLATE_FILE}" "${temp_file}"
-    "${EDITOR:-"vim"}" "${temp_file}"
+    "${EDITOR:-vim}" "${temp_file}"
 
     cmp -s "${TEMPLATE_FILE}" "${temp_file}" && \
         { log info "No changes made"; return 0; }
@@ -278,7 +278,7 @@ EOF
 function InteractiveReview() {
     cd "${JOURNAL_DIR}" || { log error "failed to enter '${JOURNAL_DIR}' journal directory"; return 1; }
 
-    log info "Interactive review: Use Enter to select/view, 'r' to refresh list, 'q' to quit."
+    log info "Interactive review:"
 
     while true; do
         local selected=""
@@ -314,12 +314,11 @@ function InteractiveReview() {
 function EditJournal() {
     TEMP_FILE="${JOURNAL_DIR}/.${JOURNAL_FILE##*/}.tmp"
 
-    if [[ -n "${EDITOR}" ]]; then
-        command -v "${EDITOR}" &> /dev/null || {
-            log info "EDITOR '${EDITOR^}' not found faling back to vim"
-            EDITOR="vim"
-        }
-    fi
+    EDITOR="${EDITOR:-vim}"
+    command -v "${EDITOR}" &> /dev/null || {
+        log info "EDITOR '${EDITOR^}' not found faling back to vim"
+        EDITOR="vim"
+    }
 
     require_file "${TEMPLATE_FILE}" || {
         printf '%s\n' "Template here" > "${TEMPLATE_FILE}"
@@ -384,8 +383,8 @@ function main() {
             --show*)                show_journal=1;
                                     require_var "${value}" && \
                                     journal_file="${JOURNAL_DIR}/spls/${value}" ;;
-            -review*)               show_journal=1 review_journal=1             ;;
-            -i|-interactive)        interactive_mode=1                          ;;
+            --review*)               show_journal=1 review_journal=1             ;;
+            -i|--interactive)        interactive_mode=1                          ;;
             --no-color)             override_no_color=1                         ;;
             -C|--color)             override_color=1                            ;;
             -v|--verbose)           override_verbose=1                          ;;

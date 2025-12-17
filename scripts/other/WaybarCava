@@ -211,13 +211,12 @@ function main() {
     while read -r line < "${pipe}" || true; do
         visualizer_output=$(printf '%s\n' "${line}" | sed -u "${dict}")
         # detect if there's any visualizer activity (i.e., non-empty output)
-        if [[ -n "${visualizer_output}" && "${visualizer_output}" != "${cava_bar}" ]]; then
-            # JSON output with a class to enable dynamic output
-            printf '%s\n' "{\"text\": \"${visualizer_output}\", \"class\": \"active\"}"
-        else
+        if [[ -z "${visualizer_output}" && "${visualizer_output}" == "${cava_bar}" ]]; then
             # JSON output with a class indicating idle state
-            printf '%s\n' "{\"text\": \"${visualizer_output}\", \"class\": \"inactive\"}"
+            printf '%s\n' "{\"text\":\"\",\"class\":\"inactive\"}"; continue
         fi
+        # JSON output with a class to enable dynamic output
+        printf '%s\n' "{\"text\":\"${visualizer_output}\",\"class\":\"active\"}"
     done
 }
 

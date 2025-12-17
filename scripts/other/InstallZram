@@ -3,7 +3,7 @@
 SCRIPT_PATH="/usr/local/bin/InitZram"
 ZRAM_INFO_FILE="/var/tmp/zram-info"
 SERVICE_NAME="initzram"
-RAM_FACTOR="4"
+ZRAM_FACTOR="4"
 ZRAM_ALGO="zstd"
 DEFAULT_ZRAM_SIZE="1G"
 
@@ -26,6 +26,17 @@ function Install() {
         log error "${log_error_msg}"; return 1
     fi
     log info "${log_info_msg}"
+}
+
+function ShowUsage() {
+    printf '%b\n' \
+        "usage: ${0##*/} -i [optional_flags]" \
+        "   -s,--service       service name" \
+        "   -p,--script-path   scritp path to be saved (default: ${SCRIPT_PATH})" \
+        "   -i,--install       init install" \
+        "   --zram-factor      zram factor (default: 1/${ZRAM_FACTOR} of host RAM)" \
+        "   --algo,--zram-algo zram algorithm (default: ${ZRAM_ALGO})" \
+        ""
 }
 
 function ScriptContent() {
@@ -55,7 +66,7 @@ ZRAM_DEV="\$(zramctl --find)"
 [ -n "\${ZRAM_DEV}" ] || { log error "Failed to find ZRAM device"; exit 1; }
 
 ZRAM_SIZE=\$( \\
-    awk '/MemTotal:/ { printf "%dM\\n", int( ( (\$2)/(1024) ) / $RAM_FACTOR ) }' \\
+    awk '/MemTotal:/ { printf "%dM\\n", int( ( (\$2)/(1024) ) / $ZRAM_FACTOR ) }' \\
         /proc/meminfo
 )
 
@@ -170,10 +181,11 @@ function main() {
         fi
         case "${arg}" in
             -s|--service*)          override_service_name="${value}"    ;;
-            --ram-factor)           override_zram_factor="${value}"     ;;
-            --algo*|--zram-algo*)   override_zram_algo="${value}"       ;;
             -p|--script-path)       override_script_path="${value}"     ;;
+            --zram-factor)          override_zram_factor="${value}"     ;;
+            --algo*|--zram-algo*)   override_zram_algo="${value}"       ;;
             --install)              install_init=1                      ;;
+            -h|--help)              ShowUsage; return 0                 ;;
         esac
     done
 
@@ -186,7 +198,7 @@ function main() {
     [[ -n "${override_zram_algo}" ]] && \
         ZRAM_ALGO="${override_zram_algo}"
     [[ -n "${override_zram_factor}" ]] && \
-        RAM_FACTOR="${override_zram_factor}"
+        ZRAM_FACTOR="${override_zram_factor}"
     [[ -n "${override_script_path}" ]] && \
         SCRIPT_PATH="${override_script_path}"
 
