@@ -9,7 +9,7 @@ CONFIG_FILE="${HOME}/.config/custom/${0##*/}/config"
 SYNC_="rsync"
 
 # LOG=0 ERROR=1 INFO=2 DEBUG=3
-LOG_LEVEL=1
+LOGLEVEL=1
 
 declare -a COPY_FILES=()
 declare -a COPY_DIRS=()
@@ -25,12 +25,21 @@ HL="\033[1m"
 function log() {
     local _type="${1}"; shift
     local _color="" _t=""
-    local -g info_color="\033[38;2;85;255;126m" \
-        warn_color="\033[38;2;255;170;10m" \
-        error_color="\033[38;2;244;29;31m" \
-        fatal_color="\033[5m\033[38;2;255;0;0m" \
-        other_color="\033[38;2;251;255;208m" \
-        nc="\033[0m"
+    local -i fallback_level=4
+
+    local -A level=(
+        [error]=1
+        [fatal]=1
+        [warn]=1
+        [info]=2
+        [debug]=3
+        [other]=4
+    )
+
+    local -g info_color="\033[38;2;85;255;126m" warn_color="\033[38;2;255;170;10m" \
+        error_color="\033[38;2;244;29;31m" fatal_color="\033[5m\033[38;2;255;0;0m" \
+        other_color="\033[38;2;251;255;208m" nc="\033[0m"
+
     case "${_type}" in
         info) _color="${info_color}" _t=" *" ;;
         warn) _color="${warn_color}" _t=" ^" ;;
@@ -39,6 +48,10 @@ function log() {
         fatal) _color="${fatal_color}" _t=" #" ;;
         *) _color="${other_color}" _t="" ;;
     esac
+
+    severity="${level[${_type}]:-${fallback_level}}"
+
+    (( LOGLEVEL >= severity )) || return 0
 
     printf "[%b%s%b%s]: %b\n" "${_color}" "${_type}" "${nc}" "${_t}" "${*}"
 }
@@ -74,17 +87,17 @@ COPY_FILES=(
 
 ### Copy directory to destination (repo) dir
 COPY_DIRS=(
-    #    src   |    dest   | [1|0] (1 = delete files from dest if not in src, 0 = do nothing)
-    "\${H}/.bin|\${GIT_DIR}/scripts|1"
-    "\${C}/sway|\${GIT_DIR}/sway|1"
-    "\${C}/hypr|\${GIT_DIR}/hyprland|1"
-    "\${C}/i3|\${GIT_DIR}/i3|1"
-    "\${C}/waybar|\${GIT_DIR}/waybar|1"
-    "\${C}/wofi|\${GIT_DIR}/wofi|1"
-    "\${C}/yazi|\${GIT_DIR}/yazi|1"
-    "\${C}/foot|\${GIT_DIR}/foot|1"
-    "\${C}/kitty|\${GIT_DIR}/kitty|1"
-    "\${C}/alacritty|\${GIT_DIR}/alacritty|1"
+    #    src   |    dest   | 1 = delete files from dest if not in src, 0 = do nothing | copy links
+    "\${H}/.bin|\${GIT_DIR}/scripts|1|1"
+    "\${C}/sway|\${GIT_DIR}/sway|1|0"
+    "\${C}/hypr|\${GIT_DIR}/hyprland|1|0"
+    "\${C}/i3|\${GIT_DIR}/i3|1|0"
+    "\${C}/waybar|\${GIT_DIR}/waybar|1|0"
+    "\${C}/wofi|\${GIT_DIR}/wofi|1|0"
+    "\${C}/yazi|\${GIT_DIR}/yazi|1|0"
+    "\${C}/foot|\${GIT_DIR}/foot|1|0"
+    "\${C}/kitty|\${GIT_DIR}/kitty|1|0"
+    "\${C}/alacritty|\${GIT_DIR}/alacritty|1|0"
 )
 
 # vim:filetype=iss
@@ -140,7 +153,8 @@ function SourceConfig() {
         CreateConfig "${config_file}"
     fi
     # shellcheck source=/dev/null
-    source "${config_file}" || { log error "Failed to source '${config_file}'"; return 1; }
+    source "${config_file}" || \
+        { log error "Failed to source '${config_file}'"; return 1; }
 }
 
 function EditConfig() {
@@ -178,12 +192,11 @@ function CopyFiles() {
     mkdir -p "${dest_%/*}"
 
     if [[ "$SYNC_" == "rsync" ]]; then
-        [[ $LOG_LEVEL -ge 2 ]] && cmd_flags+=( "--progress" )
+        [[ "$LOGLEVEL" -ge 2 ]] && cmd_flags+=( "--progress" )
         cmd_flags+=( "--archive" )
     elif [[ "$SYNC_" == "cp" ]]; then
-        [[ $LOG_LEVEL -ge 2 ]] && cmd_flags+=( "--verbose" )
-        cmd_flags+=( "--archive" )
-        cmd_flags+=( "--recursive" )
+        [[ "$LOGLEVEL" -ge 2 ]] && cmd_flags+=( "--verbose" )
+        cmd_flags+=( "--archive"  "--recursive" )
     fi
 
     if $SYNC_ "${cmd_flags[@]}" "${src_}" "${dest_}"; then
@@ -194,9 +207,10 @@ function CopyFiles() {
 }
 
 function CopyDirs() {
-    local src_="$1"
-    local dest_="$2"
-    local -i delete_flag=$3
+    local src_="${1}"
+    local dest_="${2}"
+    local -i delete_flag=${3}
+    local -i copy_links=${4}
     local -a cmd_flags=()
 
     if [[ ! -d "${src_}" ]]; then
@@ -212,11 +226,13 @@ function CopyDirs() {
     mkdir -p "${dest_}"
 
     if [[ "$SYNC_" == "rsync" ]]; then
-        [[ $LOG_LEVEL -ge 2 ]] && cmd_flags+=( "--progress" )
-        [[ $delete_flag -eq 1 ]] && cmd_flags+=( "--delete" )
+        [[ "$LOGLEVEL" -ge 2 ]] && cmd_flags+=( "--progress" )
+        [[ "$delete_flag" -eq 1 ]] && cmd_flags+=( "--delete" )
+        [[ "$copy_links" -eq 1 ]] && cmd_flags+=( "-L" )
         cmd_flags+=( "--archive" )
     elif [[ "$SYNC_" == "cp" ]]; then
-        [[ $LOG_LEVEL -ge 2 ]] && cmd_flags+=( "--verbose" )
+        [[ "$LOGLEVEL" -ge 2 ]] && cmd_flags+=( "--verbose" )
+        [[ "$copy_links" -eq 1 ]] && cmd_flags+=( "-L" )
         cmd_flags+=( "--archive" "--no-target-directory"  )
     fi
 
@@ -305,7 +321,7 @@ function PushToRepo() {
         "$(git symbolic-ref --short HEAD)"
     )
 
-    [[ $force_push -eq 1 ]] && git_flags+=( "--force" )
+    [[ "$force_push" -eq 1 ]] && git_flags+=( "--force" )
 
     log info "Push (force) changes to git@github.com:${REMOTE_USERNAME}/${REPO_NAME}.git"
     if git push "${git_flags[@]}"; then
@@ -328,9 +344,9 @@ function Usage() {
     ""  \
     "Options:" \
     "  -h, --help            Show this help message and exit" \
-    "  -v, --verbose         Set verbose output (LOG_LEVEL=1)" \
+    "  -v, --verbose         Set verbose output (LOGLEVEL=1)" \
     "  -l=N, --log=N         Set log level (0=none, 1=error, 2=info, 3=debug)" \
-    "  -d, --debug           Enable debug level logging (LOG_LEVEL=3)" \
+    "  -d, --debug           Enable debug level logging (LOGLEVEL=3)" \
     "  -e, --edit            Edit the config file ($(ColorPath "${CONFIG_FILE}"))" \
     "  -s, --show            Show the config file ($(ColorPath "${CONFIG_FILE}"))" \
     "  -g, --git-status      Show git status of your dotfile repo after backup" \
@@ -359,6 +375,7 @@ function main() {
     local -i should_push=0 should_clone=0
     local -i show_help=0 show_config=0
     local -i force_push=0 should_edit_config=0
+    local -i delete_flag=0 copy_links=0
 
     # Clone directory
     local clone_dir=""
@@ -375,14 +392,14 @@ function main() {
         fi
         [[ "${arg}" == --* ]] && arg="${arg//--/-}"
         case "${arg}" in
-            -l|-log*)               LOG_LEVEL=${value}; [[ -z "${LOG_LEVEL}" ]] && LOG_LEVEL=1 ;;
+            -l|-log*)               LOGLEVEL=${value}; [[ -z "${LOGLEVEL}" ]] && LOGLEVEL=1 ;;
             -g|-gs|-git*status)     git_status=1 ;;
             -e|-edit)               should_edit_config=1 ;;
             -s|-show*)              show_config=1 ;;
-            -d|-debug)              LOG_LEVEL=2 ;;
-            -v|-verbose|-progress)  LOG_LEVEL=1 ;;
+            -d|-debug)              LOGLEVEL=2 ;;
+            -v|-verbose|-progress)  LOGLEVEL=1 ;;
             -c|--clone*)            clone_dir="${value}"; should_clone=1 ;;
-            -p|-push)               should_push=1 LOG_LEVEL=2 ;;
+            -p|-push)               should_push=1 LOGLEVEL=2 ;;
             -force)                 force_push=1 ;;
             -h|-help)               show_help=1 ;;
             *)
@@ -400,15 +417,16 @@ function main() {
 
     log debug "Using GIT_DIR=$(ColorPath "${GIT_DIR}")"
     log debug "Using git_status=$git_status"
-    log debug "Using LOG_LEVEL=$LOG_LEVEL"
+    log debug "Using LOGLEVEL=$LOGLEVEL"
     log debug "Using SYNC_=$SYNC_"
-    [[ $LOG_LEVEL -eq 1 ]] && log debug "Verbose is set"
-    [[ $LOG_LEVEL -eq 2 ]] && log debug "Debugging enabled"
-    [[ $git_status -eq 1 ]] && log debug "git_status is set"
 
-    [[ $show_help -eq 1 ]] && { Usage; return 0; }
-    [[ $show_config -eq 1 ]] && { ShowConfig; return 0; }
-    [[ $should_edit_config -eq 1 ]] && { EditConfig "${CONFIG_FILE}"; return 0; }
+    [[ "$LOGLEVEL" -eq 1 ]] && log debug "Verbose is set"
+    [[ "$LOGLEVEL" -eq 2 ]] && log debug "Debugging enabled"
+    [[ "$git_status" -eq 1 ]] && log debug "git_status is set"
+
+    [[ "$show_help" -eq 1 ]] && { Usage; return 0; }
+    [[ "$show_config" -eq 1 ]] && { ShowConfig; return 0; }
+    [[ "$should_edit_config" -eq 1 ]] && { EditConfig "${CONFIG_FILE}"; return 0; }
 
     ValidatePaths COPY_FILES || return 1
     ValidateDirPaths COPY_DIRS || return 1
@@ -442,11 +460,11 @@ function main() {
 
     # Start copying directory content with selective deletion
     for dir_spec in "${COPY_DIRS[@]}"; do
-        IFS=$'|' read -r src dest delete_flag <<< "${dir_spec}"
-        CopyDirs "${src}" "${dest}" "${delete_flag}"
+        IFS=$'|' read -r src dest delete_flag copy_links <<< "${dir_spec}"
+        CopyDirs "${src}" "${dest}" "${delete_flag:-0}" "${copy_links:-0}"
     done
 
-    if [[ ${git_status} -eq 1 ]]; then
+    if [[ "$git_status" -eq 1 ]]; then
         printf '\n\n'
         cd "${GIT_DIR}"
         if git status &> /dev/null; then
@@ -458,10 +476,10 @@ function main() {
 
     printf '\n' && log info "Dotfile directory: ${BLUE}$(ColorPath "${GIT_DIR}")${NC}\n"
 
-    if [[ $should_push -eq 1 ]]; then
+    if [[ "$should_push" -eq 1 ]]; then
         log debug "Backup will be pushed to github"
 
-        [[ $force_push -eq 1 ]] && log debug "Force push"
+        [[ "$force_push" -eq 1 ]] && log debug "Force push"
         PushToRepo "${force_push}" || return 1
     else
         return 0

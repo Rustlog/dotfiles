@@ -3,7 +3,7 @@
 ## This is my personal dotfile repo for the Void Linux setup.
 
 ## WM (Window manager - sway)
-![](docs/images/void-linux-fastfetch-output.webp)
+![](share/images/void-linux.webp)
 
 #### Core configuration (Main setup):
 - **Scripts:** [Handy scripts (MountSSH, Dotsync, JournalToday and more)](scripts/)
@@ -23,40 +23,6 @@
 - **Alacritty**: [~/.config/alacritty/alacritty.toml](alacritty/alacritty.toml)
 - **Qutebrowser**: [~/.config/qutebrowser](qutebrowser/)
 - **Kitty**: [~/.config/kitty/kitty.conf](kitty/kitty.conf)
-
-### Tree view
-```
-~-- sway/                       # Sway WM config and scripts
-|   |-- lock_screen/
-|   |-- scripts/
-|   `-- waybar/
-|-- i3/                         # Old i3
-|   `-- wallpapers/
-|-- scripts/                    # Personal scripts
-|   |-- main/
-|   `-- other/
-|-- shell/                      # Main shell config for bash and ZSH
-|-- waybar/                     # Waybar - status bar config
-|   `-- scripts/
-|-- neovim/                     # Neovim config
-|-- vim/                        # Vim config
-|-- foot/                       # Foot terminal
-|-- alacritty/                  # Alacritty
-|-- bootstrap/                  # Bootstrap scripts for void and arch
-|   |-- arch/
-|   `-- void/
-|-- fuzzel/                     # Application launcher
-|-- hyprland/                   # Dynamic tiling WM
-|   |-- scripts/
-|   `-- waybarconfig/
-|-- qutebrowser/                # Vim like browser
-|
-~-- templates_configs_scripts/  # Any code or script template goes here
-    |-- automation_scripts/
-    |-- code_templates/
-    `-- system_configs/
-
-```
 
 ### Dotfile manager
 **scripts/main/Dotsync**: is the main tool to sync system and user settings into dotfile repo, it can backup up config, clone, sync, and push push your dotfiles.

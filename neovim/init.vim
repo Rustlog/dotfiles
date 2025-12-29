@@ -74,76 +74,29 @@ function! ToggleWrap()
 endfunction
 command! ToggleWrap :call ToggleWrap()
 
-" Run C++ code
-command! RunCpp w | execute '!clang -x c++ -pedantic -std=c++20 -lstdc++ -fno-elide-constructors -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . '; rm ' . shellescape(expand('%:p:r'))
-
-" Run C code
-command! RunC w | execute '!clang -x c -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
-
 " Abort the commit message
 command! GitAbort : !mv "%" "%.bak" | :q!
 
+" Run C++ code
+command! RunCpp w | execute
+    \ '!clang -x c++ -pedantic -std=c++20 -lstdc++ -fno-elide-constructors -Wall -Wextra -O0 ' .
+    \ shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' .
+    \ shellescape(expand('%:p:r')) . '; rm ' . shellescape(expand('%:p:r'))
+
+" Run C code
+command! RunC w | execute 
+    \ '!clang -x c -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' .
+    \ shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) .
+    \ ' ; rm ' . shellescape(expand('%:p:r'))
+
 " Automatically jump to the last cursor position when reopening a file
-autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") | exe "norm! g`\" | zz" | endif
+autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") |
+    \ exe "norm! g`\" | zz" | endif
 " autocmd BufRead,BufNewFile *.conf set filetype=dosini
-
-" C tmeplate
-autocmd BufNewFile *.c call setline(1, [
-    \ '//usr/bin/env gcc -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
-    \ '',
-    \ '# include <stdio.h>',
-    \ '# include <stdlib.h>',
-    \ 'int main(void) {',
-    \ '    fprintf(stdout, "%s\n", "Hello World!");',
-    \ '    return EXIT_SUCCESS;',
-    \ '}',
-    \ ''
-\])
-
-" C++ tmeplate
-autocmd BufNewFile *.cpp,*.cxx,*.cc,*.c++ call setline(1, [
-    \ '//usr/bin/env gcc -x c++ -lstdc++ -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
-    \ '',
-    \ '# include <iostream>',
-    \ '# include <cstdlib>',
-    \ '',
-    \ 'int main(void) {',
-    \ "    std::cout << \"Hello World!\" << '\\n';",
-    \ '    return EXIT_SUCCESS;',
-    \ '}',
-    \ ''
-\])
-
-" Python tmeplate
-autocmd BufNewFile *.py call setline(1, [
-    \ "#!/usr/bin/env python3",
-    \ "",
-    \ "def main():",
-    \ "    print()",
-    \ "",
-    \ "if __name__ == '__main__':",
-    \ "    main()",
-    \ ""
-\])
-
-" Bash tmeplate
-autocmd BufNewFile *.sh call setline(1, [
-    \ '#!/usr/bin/env bash',
-    \ '',
-    \ 'set -euo pipefail',
-    \ '',
-    \ 'function main() {',
-    \ '    echo "Hello World!"',
-    \ '}',
-    \ '',
-    \ 'main "${@}"',
-    \ ''
-\])
 
 " Plugin manager (lazy.vim)
 
 lua <<EOF
-
 local lazypath = "/usr/share/nvim/lazy_plugins/lazy.nvim"
 
 -- Clone it as root
@@ -261,7 +214,8 @@ require("lazy").setup({
                     "force",
                     config,
                     {
-                      capabilities = vim.tbl_deep_extend("force", config.capabilities or {}, capabilities),
+                      capabilities = vim.tbl_deep_extend("force",
+                            config.capabilities or {}, capabilities),
                       on_init = config.on_init,
                       on_attach = config.on_attach,
                     }
@@ -276,9 +230,11 @@ require("lazy").setup({
                     config,
                     {
                       default_config = {
-                        cmd = { "clangd", "--background-index", "--clang-tidy", "--header-insertion=iwyu" },
+                        cmd = { "clangd", "--background-index",
+                                "--clang-tidy", "--header-insertion=iwyu" },
                       },
-                      capabilities = vim.tbl_deep_extend("force", config.capabilities or {}, capabilities),
+                      capabilities = vim.tbl_deep_extend("force",
+                            config.capabilities or {}, capabilities),
                     }
                   )
                   vim.lsp.enable("clangd")
@@ -290,11 +246,16 @@ require("lazy").setup({
             vim.api.nvim_create_autocmd("LspAttach", {
               callback = function(ev)
                 local opts = { buffer = ev.buf, silent = true }
-                vim.keymap.set("n", "gd", vim.lsp.buf.definition, vim.tbl_extend("force", opts, { desc = "Goto Definition" }))
-                vim.keymap.set("n", "gr", vim.lsp.buf.references, vim.tbl_extend("force", opts, { desc = "Goto References" }))
-                vim.keymap.set("n", "K", vim.lsp.buf.hover, vim.tbl_extend("force", opts, { desc = "Hover" }))
-                vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, vim.tbl_extend("force", opts, { desc = "Rename" }))
-                vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, vim.tbl_extend("force", opts, { desc = "Code Action" }))
+                vim.keymap.set("n", "gd", vim.lsp.buf.definition,
+                        vim.tbl_extend("force", opts, { desc = "Goto Definition" }))
+                vim.keymap.set("n", "gr", vim.lsp.buf.references,
+                        vim.tbl_extend("force", opts, { desc = "Goto References" }))
+                vim.keymap.set("n", "K", vim.lsp.buf.hover,
+                        vim.tbl_extend("force", opts, { desc = "Hover" }))
+                vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename,
+                        vim.tbl_extend("force", opts, { desc = "Rename" }))
+                vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action,
+                        vim.tbl_extend("force", opts, { desc = "Code Action" }))
               end,
             })
           end,
@@ -315,8 +276,62 @@ autocmd BufWritePost *.sh,*.py if getline(1) =~ '^#!' | silent !chmod +x '%' | e
 
 " Set colorscheme based on filetype
 augroup ColorSchemeSelector
-    autocmd FileType     sh,zsh,bash                colorscheme slate
     autocmd FileType     c,cpp                      colorscheme tokyonight-moon
     autocmd FileType     iss                        colorscheme molokai
 augroup END
+
+" C tmeplate
+autocmd BufNewFile *.c call setline(1, [
+    \ '//usr/bin/env gcc -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '',
+    \ '# include <stdio.h>',
+    \ '# include <stdlib.h>',
+    \ '# include <stdint.h>',
+    \ '',
+    \ 'int main(void) {',
+    \ '    fprintf(stdout, "%s\n", "Hello World!");',
+    \ '    return EXIT_SUCCESS;',
+    \ '}',
+    \ ''
+\])
+
+" C++ tmeplate
+autocmd BufNewFile *.cpp,*.cxx,*.cc,*.c++ call setline(1, [
+    \ '//usr/bin/env gcc -x c++ -lstdc++ -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '',
+    \ '# include <iostream>',
+    \ '# include <cstdlib>',
+    \ '',
+    \ 'int main(void) {',
+    \ "    std::cout << \"Hello World!\" << '\\n';",
+    \ '    return EXIT_SUCCESS;',
+    \ '}',
+    \ ''
+\])
+
+" Python tmeplate
+autocmd BufNewFile *.py call setline(1, [
+    \ "#!/usr/bin/env python3",
+    \ "",
+    \ "def main():",
+    \ "    print()",
+    \ "",
+    \ "if __name__ == '__main__':",
+    \ "    main()",
+    \ ""
+\])
+
+" Bash tmeplate
+autocmd BufNewFile *.bash call setline(1, [
+    \ '#!/usr/bin/env bash',
+    \ '',
+    \ 'set -euo pipefail',
+    \ '',
+    \ 'function main() {',
+    \ '    echo "Hello World!"',
+    \ '}',
+    \ '',
+    \ 'main "${@}"',
+    \ ''
+\])
 

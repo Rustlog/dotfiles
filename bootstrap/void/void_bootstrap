@@ -87,8 +87,7 @@ function Check_commands() {
     local -a commands=("${@}")
     for cmd in "${commands[@]}"; do
         if ! command -v "${cmd}" &> /dev/null; then
-            log error "'${cmd}' command not found"
-            return 1
+            log error "'${cmd}' command not found"; return 1
         fi
     done
 }
@@ -110,15 +109,15 @@ function Check_deps() {
 }
 
 function Move() {
-    local src="${1}"
-    local dest="${2}"
+    local src="${1}" dest="${2}"
+    local perms="${3:-0755}"
     local dest_dir="${dest%%/"${dest##*/}"}"
     sudo mkdir -p "${dest_dir}"
     sudo chown root:root "${dest_dir}"
     sudo mv "${src}" "${dest}"
     sudo chown root:root "${dest}"
     sudo rm -f "${src}" &> /dev/null || true
-    sudo chmod 0755 "${dest}"
+    sudo chmod "${perms}" "${dest}"
 }
 
 function Enable_service() {
@@ -314,7 +313,7 @@ EOF
 
 function SRC_build_nbfc_fancontrol() {
     local url="https://github.com/nbfc-linux/nbfc-linux.git"
-    local clone_dir="$HOME/repos/nbfc"
+    local clone_dir="$HOME/dev/repos/nbfc"
     local -a deps=( gcc libcurl-devel )
     Check_deps "${deps[@]}"
     # if binary already exists just create and enable service
@@ -323,17 +322,19 @@ function SRC_build_nbfc_fancontrol() {
             Enable_service nbfc-linux || return 1
         return 0
     fi
+
     mkdir -p "${clone_dir}"
-    if [[ -d "${clone_dir}" ]] && ! rmdir "${clone_dir}" &> /dev/null; then
-        read -r -n1 -p "'${clone_dir}' dir is not empty, remove it? y(es)|n(o), f(force) or q(uit): " yes_no
-        [[ "${yes_no}" =~ ^(Q|q)$ ]] && return 1
-        if [[ "${yes_no}" =~ ^(y|Y|f|F)$ ]]; then
-            rm -rf "${clone_dir}" && mkdir -p "${clone_dir}"
-        elif [[ "${yes_no}" =~ ^(N|n)$ ]]; then
-            clone_dir="${clone_dir}_$(od -An -tx1 -N1 /dev/urandom | sed 's/ //g')"
-            log info "New clone dir '${clone_dir}'"
+    if [[ -d "${clone_dir}" ]]; then
+        cd "${clone_dir}" || { log error "failed to chdir to ${clone_dir}"; return 1; }
+        if git status --short &>/dev/null; then
+            git pull --rebase --depth=1 "${url}"
+        else
+            git clone --depth=1 "${url}" "${clone_dir}"
         fi
+    else
+        git clone --depth=1 "${url}" "${clone_dir}"
     fi
+
     git clone --depth=1 "${url}" "${clone_dir}"
     cd "${clone_dir}" || log error "Failed to cd '${clone_dir}'"
     { ./autogen.sh && ./configure --prefix=/usr --sysconfdir=/etc && make && sudo make install; } || \
@@ -362,25 +363,76 @@ function Install_ActivityWatch() {
 
 function SRC_build_ly_loginmanager() {
     local url="https://codeberg.org/fairyglade/ly.git"
-    local clone_dir="$HOME/repos/ly"
+    local clone_dir="$HOME/dev/repos/ly"
 
-    local -a deps=( xorg pam-devel libxcb-devel )
-    Check_deps "${deps[@]}"
-    Check_commands zig
+    # checks
+    Check_deps xorg pam-devel libxcb-devel
+    Check_commands zig || return 1
 
+    # clone repo
     mkdir -p "${clone_dir}"
-    git clone --depth=1 "${url}" "${clone_dir}"
-    cd "${clone_dir}" || log error "Failed to cd '${clone_dir}'"
+    if [[ -d "${clone_dir}" ]]; then
+        cd "${clone_dir}" || { log error "failed to chdir to ${clone_dir}"; return 1; }
+        if git status --short &>/dev/null; then
+            git pull --rebase --depth=1 "${url}"
+        else
+            git clone --depth=1 "${url}" "${clone_dir}"
+        fi
+    else
+        git clone --depth=1 "${url}" "${clone_dir}"
+    fi
+
+    # build and install
+    cd "${clone_dir}" || log error "Failed to chdir to '${clone_dir}'"
     sudo zig build installexe -Dinit_system=runit || \
-        { log error "Failed to build ly"; cd - &> /dev/null; return 1; }
-    cd - &> /dev/null
+        { log error "Failed to build ly"; return 1; }
+
     # Enable ly service
     Enable_service ly
-    # Disable agetty on tty2
+
+    # Disable agetty/ngetty on tty2
     local service_dir="/var/service"
     [[ -L "/var/service" ]] || service_dir="/etc/runit/runsvdir/default/"
-    { sudo rm -f "${service_dir}" &> /dev/null && log info "Disabled agetty on tty2"; } || \
-        { log error "Failed to disable agetty on tty2"; return 1; }
+    cd "${service_dir}" || { log error "failed to chdir to ${service_dir}"; return 1; }
+    if [[ -L ./tty2 ]]; then
+        { sudo rm ./"tty2" && log info "Disabled agetty on tty2"; } || \
+            { log error "Failed to disable agetty on tty2"; return 1; }
+    elif sudo sv status ngetty &>/dev/null; then
+        local tmpfile
+        tmpfile="$(mktemp)"
+        if cat 1> "${tmpfile}" << EOF
+OPTS="tty1 tty3 tty4 tty5 tty6"
+EOF
+        then
+            Move "${tmpfile}" /etc/sv/ngetty/conf 0644
+        fi
+    fi
+}
+
+function Install_VTconsole_font() {
+    local service_name="vtconsole-font"
+    local tmpfile
+    tmpfile="$(mktemp)"
+    log info "Installing vtconsole-font"
+    cat 1> "${tmpfile}" << EOF
+#!/bin/sh
+
+CONFIG="/etc/vtconsole.conf"
+VTs="/dev/tty[0-9]"
+FONT="ter-v24b"
+
+[ -r "\${CONFIG}" ] && . "\${CONFIG}"
+
+for tty in \$VTs; do
+    [ -c "\${tty}" ] || continue
+    setfont -C "\${tty}" "\${FONT}"
+done
+
+exec chpst -b "vtconsole-font: applied" pause
+
+EOF
+    Move "${tmpfile}" /etc/sv/"${service_name}"/run
+    Enable_service "${service_name}"
 }
 
 function Install_Zram() {
@@ -478,9 +530,16 @@ EOF
     fi
 }
 
+function Install_limactl() {
+    local version=""
+    version="$(curl -fsSL https://api.github.com/repos/lima-vm/lima/releases/latest | jq -r .tag_name)"
+    curl -f#SLC- "https://github.com/lima-vm/lima/releases/download/${version}/lima-${version:1}-$(uname -s)-$(uname -m).tar.gz" | sudo tar Cxzvm "/usr/local/"
+    curl -f#SLC- "https://github.com/lima-vm/lima/releases/download/${version}/lima-additional-guestagents-${version:1}-$(uname -s)-$(uname -m).tar.gz" | sudo tar Cxzvm "/usr/local/"
+}
+
 function Neovim_setup() {
     Check_deps neovim nodejs
-    Check_commands npm node
+    Check_commands npm node || return 1
     local output_file="init.vim"
     local nvim_dir="/etc/xdg/nvim"
     local nvim_conf="${0%%/"${0##*/}"}/${output_file}"
@@ -517,14 +576,6 @@ function Install_graphics_tools() {
         linux-tools
     )
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
-}
-
-function Enable_mpv_mpris() {
-    # Enable mpris support for mpv
-    local library_path="/usr/lib/mpv-mpris"
-    local mpv_mpris_path="/etc/mpv/scripts/"
-    sudo mkdir -p "${mpv_mpris_path}"
-    sudo ln -sf "${library_path}"/mpris.so "${mpv_mpris_path}/"
 }
 
 function locale-gen() {
@@ -715,10 +766,17 @@ function Install_misc_tools() {
     )
 
     XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+
+    # enable services
     # Enable_service acpid
     Enable_service dbus
     Enable_service udevd
-    Enable_mpv_mpris
+
+    # Enable mpris support for mpv
+    local library_path="/usr/lib/mpv-mpris"
+    local mpv_mpris_path="/etc/mpv/scripts/"
+    sudo mkdir -p "${mpv_mpris_path}"
+    sudo ln -sf "${library_path}"/mpris.so "${mpv_mpris_path}/"
 }
 
 function Install_pentest_and_sec() {
@@ -768,11 +826,16 @@ function Install_utils() {
     local -a XBPSPkgs=(
         zip brightnessctl dust gdu tree procs firejail
         tmux rsync dnsmasq hostapd polkit elogind nftables
-        zsh zsh-syntax-highlighting openvpn zbar cronie zstd
+        zsh zsh-syntax-highlighting bash-completion openvpn zbar cronie zstd
         bat eza fzf jq lesspipe lsd micro ncdu neovim nodejs ripgrep
         fuse-sshfs lsof rsyslog plymouth man-db mlocate ngetty
         xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
-        chafa numactl fbterm frp cryptsetup
+        chafa numactl fbterm frp cryptsetup jless
+        filelight
+        keypunch fd
+        vmpk # virtual piano
+        spek-x sonic-visualiser # audio visualizers
+        cutter # a advanced debugger/disassembler
         man-pages-devel man-pages-posix # docs for C and POSIX
         libwebp-tools # cwewp
         ImageMagic NetworkManager network-manager-applet # Network Manager
@@ -833,7 +896,7 @@ function main() {
                 -f|-*force) force_reinstall=1 ;;
                 -i|-*install) install=1 ;;
                 -s|-*service) install_service_name="${value}" ;;
-                -*skip*update) update_system=0 ;;
+                --no[-_]update|--skip[-_]update) update_system=0 ;;
                 -h|--help) Usage; exit 0 ;;
                 *) log error "Unknown arg: '${arg}'" ;;
             esac
@@ -872,9 +935,11 @@ function main() {
             data*) DataBase_management ;;
             yt*) Install_yt_dlp ;;
             hypr*) Install_hyprland ;;
+            lima*) Install_limactl ;;
             activity*|parental*) Install_ActivityWatch ;;
             zram[0-9]*) Install_Zram "${arg}" ;;
             locale) locale-gen "en_US.UTF-8" ;;
+            *console[_-]font) Install_VTconsole_font ;;
             other|extras)
                 Install_extras
                 Install_productivity
@@ -896,6 +961,7 @@ function main() {
                 Install_AdGuardHome
                 Install_yt_dlp
                 Install_brew_pkg_manager
+                Install_VTconsole_font
                 SRC_build_ly_loginmanager
                 SRC_build_nbfc_fancontrol
                 ;;
