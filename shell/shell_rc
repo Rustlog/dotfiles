@@ -104,7 +104,7 @@ function Alias_vars() {
     alias V="dir=\${HOME}/Media/Videos && ${_CD_DIRS}"
     alias D="dir=\${HOME}/Downloads && ${_CD_DIRS}"
     alias L="dir=\${HOME}/LearnDir && ${_CD_DIRS}"
-    alias R="dir=\${HOME}/dev/repos && ${_CD_DIRS}"
+    alias R="dir=\${HOME}/dev/projects/repos && ${_CD_DIRS}"
     alias p="dir=\${HOME}/dev/projects && ${_CD_DIRS}"
     alias d="dir=\${HOME}/dev && ${_CD_DIRS}"
     alias lfcd="cd \$(lf -last-dir-path=/dev/stdout)"
@@ -150,7 +150,7 @@ function Alias_vars() {
     alias getcolors="env QT_QPA_PLATFORMTHEME=qt6ct kcolorchooser 2> /dev/null & disown"
     alias ffmpeg="ffmpeg -hide_banner"
     alias gcaf="git commit --amend --no-edit && git reflog expire --expire=now --all && git gc --prune=now"
-    alias mpv="mpv --volume=40 --vid=auto --audio-device=pulse"
+    alias mpv="mpv --volume=40 --vid=auto --af=\$(MpvEQ) --audio-device=pulse"
     alias "clang++"="clang++ -fdiagnostics-color=always"
     alias "clang"="clang -fdiagnostics-color=always"
 

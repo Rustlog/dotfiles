@@ -199,7 +199,7 @@ function EqualizerString() {
 function main() {
     local -a ARG_ARR=("$@")
     local volume="" video=""
-    local -i shuffle=0 play_all=0
+    local -i shuffle=0 play_all=0 enable_eq=0
     local -g loop=0 ENABLE_MPV_TUI=0
 
     CheckDependencies
@@ -230,6 +230,7 @@ function main() {
             -t|-*tui|tui) ENABLE_MPV_TUI=1 ;;
             -a|-*play*all|play*all|all) play_all=1 ;;
             -s|--shuff|shuff|--shuffle|shuffle) shuffle=1 ;;
+            -e|--eq|-eq|eq) enable_eq=1 ;;
             -d|--disown|--detach)  DETACH=1 ;;
             -h|--help|help) Usage; Exit 0 ;;
             *)
@@ -293,7 +294,11 @@ function main() {
         "--hdr-compute-peak"
         "--loop-playlist=inf"
         "--msg-level=all=error"
+    )
+    [[ "$enable_eq" -eq 1 ]] && MPV_FLAGS+=(
         "--af=$(EqualizerString)"
+    )
+    MPV_FLAGS+=(
         "--pulse-buffer=2000"
         "--pipewire-buffer=2000"
         "--really-quiet"

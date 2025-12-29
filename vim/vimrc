@@ -34,6 +34,9 @@ set tabstop=4
 " Enable 24-bit color support
 set termguicolors
 
+" Disable 24-bit color support
+" set notermguicolors
+
 " Set mouse to insert
 set mouse=i
 
@@ -73,12 +76,19 @@ endfunction
 command! RemovePlug :call RemovePlug
 
 " Automatically jump to last cursor position when reopening a file
-autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") | exe "normal! g`\" | zz" | endif
+autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") |
+    \ exe "normal! g`\" | zz" | endif
 
 " Run C++
-command! RunCpp w | execute '!gcc -x c++ -pedantic -std=c++20 -lstdc++ -fno-elide-constructors -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
+command! RunCpp w | execute
+    \ '!gcc -x c++ -pedantic -std=c++20 -lstdc++ -fno-elide-constructors -Wall -Wextra -O0 ' .
+    \ shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' .
+    \ shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
 " Run C
-command! RunC w | execute '!gcc -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' . shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' . shellescape(expand('%:p:r'))
+command! RunC w | execute
+    \ '!gcc -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' .
+    \ shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) . ' ; rm ' .
+    \ shellescape(expand('%:p:r'))
 
 " Function to toggle 'wrap' setting
 function! ToggleWrap()
@@ -92,6 +102,9 @@ endfunction
 " Wrap/unwrap toggle with F2
 nnoremap <silent><F2> :call ToggleWrap() <CR>
 command! ToggleWrap :call ToggleWrap()
+
+" auto chmod logic
+autocmd BufWritePost *.sh,*.py if getline(1) =~ '^#!' | silent !chmod +x '%' | endif
 
 " C tmeplate
 autocmd BufNewFile *.c call setline(1, [
@@ -150,7 +163,4 @@ autocmd BufNewFile *.sh call setline(1, [
     \ 'main "${@}"',
     \ ''
 \])
-
-" auto chmod logic
-autocmd BufWritePost *.sh,*.py if getline(1) =~ '^#!' | silent !chmod +x '%' | endif
 

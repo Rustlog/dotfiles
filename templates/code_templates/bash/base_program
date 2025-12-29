@@ -3,6 +3,50 @@
 builtin set -euo pipefail
 
 NO_COLOR=0
+LOGLEVEL="${LOGLEVEL:-0}"
+
+function log() {
+    local _type="${1:-}"; shift
+    local _color="" _t="" severity=""
+    local -i default_level=4
+
+    local -A level=(
+        [error]=1
+        [fatal]=1
+        [warn]=1
+        [info]=2
+        [debug]=3
+        [other]=4
+    )
+
+    local -g _info_color="" _warn_color="" _error_color=""
+        _fatal_color="" _other_color="" _nc=""
+    _info_color="" _warn_color="" _error_color="" _fatal_color="" _other_color="" _nc=""
+    is_flag_disabled "$NO_COLOR" && _info_color="\033[38;2;85;255;126m" \
+        _warn_color="\033[38;2;255;170;10m" _error_color="\033[38;2;244;29;31m" \
+        _fatal_color="\033[5m\033[38;2;255;0;0m" _other_color="\033[38;2;251;255;208m" _nc="\033[0m"
+    case "${_type}" in
+        info) _color="${_info_color:-}" _t="*"    ;;
+        warn) _color="${_warn_color:-}" _t="^"    ;;
+        error) _color="${_error_color:-}" _t="!"  ;;
+        fatal) _color="${_fatal_color:-}" _t="#"  ;;
+        *) _color="${_other_color-""}" _t=""      ;;
+    esac
+
+    severity="${level[${_type}]:-${default_level}}"
+
+    (( LOGLEVEL >= severity )) || return 0
+
+    printf "[%b%s%b%s]: %s: %b\n" \
+        "${_color}" "${_type}" "${_nc}" "${_t}" "${FUNCNAME[1]}()" "${*//$HOME/\~}"
+    return 0
+}
+
+#!/usr/bin/env bash
+
+builtin set -euo pipefail
+
+NO_COLOR=0
 
 # Pretty logging
 function log() {
@@ -118,12 +162,63 @@ function Install() {
     return 0
 }
 
+# Flag parser
+function parse_args() {
+    local -n args=${1}
+
+    local flag1_var="" flag2_var="" flag3_var=""
+    local flag4_var="" flag5_var="" flag6_var=""
+
+    local arg="" value=""
+    for ((i=0;i<${#args[@]};i++)); do
+        arg="${args[i]}"
+        [[ ( "$((${#args[@]} - i))" -ge 1 && -n "${args[$((i+1))]:-}" ) && \
+            "${args[$((i+1))]:-}" != -* ]] && \
+            value="${args[$((i+1))]:-}" i=$((i+1))
+        if [[ "${arg}" == -*=* ]]; then
+            IFS=$'=' read -r arg value <<< "${arg}"
+            [[ -n "${value}" ]] || \
+                { log error "'${arg}' requires a value"; return 1; }
+        fi
+        case "${arg}" in
+            --flag1) flag1_var="${value}" ;;
+            --flag2) flag2_var="${value}" ;;
+            --flag3) flag3_var="${value}" ;;
+            --flag4) flag4_var="${value}" ;;
+            --flag5) flag5_var="${value}" ;;
+            --flag6) flag6_var="${value}" ;;
+            *) log error "Invalid argument: '${arg}'" ;;
+        esac
+    done
+
+    log_message() {
+        local -n flag_var_ref=${1}
+        local -i n=${2}
+        flag_var_ref="${flag_var_ref:-}"
+        { [[ -n "${flag_var_ref}" ]] && log info "flag${n} var: '${flag_var_ref}'"; } || \
+            log warn "flag${n} var (empty): '${flag_var_ref}'"
+    }
+
+    log_message flag1_var 1
+    log_message flag2_var 2
+    log_message flag3_var 3
+    log_message flag4_var 4
+    log_message flag5_var 5
+    log_message flag6_var 6
+
+    unset -f log_message
+}
+
 function main() {
+    local -a arguments
+    arguments=("${@}")
     local empty_var=""
     local some_value="something"
     local non_existant_dir="${HOME}/dev/log_dir"
     local non_existant_file="${non_existant_dir}/log_file"
     local -i flag_on=1 flag_off=0
+
+    parse_args arguments
 
     is_var_empty "${empty_var}" && \
         log warn "'empty_var' is empty"
@@ -137,6 +232,14 @@ function main() {
         log info "'flag_on' is enabled"
     is_flag_disabled "$flag_off" && \
         log warn "'flag_off' is disabled"
+
+    log fatal "fatal"
+    log error "error"
+    log warn "warning"
+    log info "info"
+    log debug "debug"
+    log other "other"
+    log trace "trace"
 }
 
 main "${@}"

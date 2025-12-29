@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
 
+# Copyright (C) 2026 Rustlog
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+
 # RyzenProfile - Ryzen power profile daemon using ryzenadj
 # Single file (this cli) installs Init service and daemon script
 #
@@ -14,11 +29,19 @@
 # @Author: Rustlog
 # @Github: https://github.com/Rustlog/ryzenprofile
 # @Version: v1.0
-# @License: MIT
+# @License: GPLv3
 #
 
 # Enable exit on error, unset var, or pipe fail
 builtin set -euo pipefail
+
+# metadata about this package
+VERSION="v1.0"
+AUTHOR="Rustlog"
+REMOTE_REPO="https://github.com/Rustlog/ryzenprofile"
+LICENSE="GPLv3"
+
+readonly VERSION AUTHOR REMOTE_REPO LICENSE
 
 # Global readonly defaults
 SCRIPT_NAME="${0##*/}" \
@@ -164,6 +187,24 @@ function create_dir() {
             log error "Failed to create '${dir}'"
         fi
     fi
+}
+
+# Show info about this tool
+function ShowInfo() {
+    local action_type="${1}"
+    case "${action_type}" in
+        license) printf '%s\n' "${LICENSE}"  ;;
+        version) printf '%s\n' "${VERSION}"  ;;
+        author) printf '%s\n' "${AUTHOR}"    ;;
+        repo) printf '%s\n' "${REMOTE_REPO}" ;;
+        about)
+            printf '%s\n' \
+                "License: ${LICENSE}" \
+                "Version: ${VERSION}" \
+                "Author: ${AUTHOR}" \
+                "Repo: ${REMOTE_REPO}"
+            ;;
+    esac
 }
 
 # HELPER function -- Move src (file) to dest (file)
@@ -993,8 +1034,13 @@ function main() {
             -h|--help)           show_usage=1                               ;;
             --custom-args)       custom_args="${value}" a=1                 ;;
             -C|--no-color)       override_no_color=1                        ;;
-            --color)             override_color=1                        ;;
-            -v|--verbose)        verbose=1                                  ;;
+            --color)             override_color=1                           ;;
+            -v|--version)       ShowInfo version; return 0                  ;;
+            --author)           ShowInfo author ; return 0                  ;;
+            --license)          ShowInfo license; return 0                  ;;
+            --repo)             ShowInfo repo; return 0                     ;;
+            --about)            ShowInfo about; return 0                    ;;
+            -V|--verbose)        verbose=1                                  ;;
             *) log error "Unknown option: '${arg}', use --help to see options" ;;
         esac
     done

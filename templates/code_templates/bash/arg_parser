@@ -27,10 +27,10 @@ function log() {
             _nc="\033[0m"
     fi
     case "${_type}" in
-        info) _color="${_info_color:-""}" _t="*" ;;
-        warn) _color="${_warn_color:-""}" _t="^" ;;
-        error) _color="${_error_color:-""}" _t="!" ;;
-        fatal) _color="${_fatal_color:-""}" _t="#" ;;
+        info) _color="${_info_color:-}" _t="*" ;;
+        warn) _color="${_warn_color:-}" _t="^" ;;
+        error) _color="${_error_color:-}" _t="!" ;;
+        fatal) _color="${_fatal_color:-}" _t="#" ;;
         *) _color="${_other_color-""}" _t="" ;;
     esac
 
@@ -47,10 +47,10 @@ function parse_args() {
     local arg="" value=""
     for ((i=0;i<${#args[@]};i++)); do
         arg="${args[i]}"
-        [[ ( "$((${#args[@]} - i))" -ge 1 && -n "${args[$((i+1))]:-""}" ) && \
-            "${args[$((i+1))]:-""}" != -* ]] && \
-            value="${args[$((i+1))]:-""}" i=$((i+1))
-        if [[ "${arg}" == -* && "${arg}" == *=* ]]; then
+        [[ ( "$((${#args[@]} - i))" -ge 1 && -n "${args[$((i+1))]:-}" ) && \
+            "${args[$((i+1))]:-}" != -* ]] && \
+            value="${args[$((i+1))]:-}" i=$((i+1))
+        if [[ "${arg}" == -*=* ]]; then
             IFS=$'=' read -r arg value <<< "${arg}"
             [[ -n "${value}" ]] || \
                 { log error "'${arg}' requires a value"; return 1; }
@@ -69,7 +69,7 @@ function parse_args() {
     log_message() {
         local -n flag_var_ref=${1}
         local -i n=${2}
-        flag_var_ref="${flag_var_ref:-""}"
+        flag_var_ref="${flag_var_ref:-}"
         { [[ -n "${flag_var_ref}" ]] && log info "flag${n} var: '${flag_var_ref}'"; } || \
             log warn "flag${n} var (empty): '${flag_var_ref}'"
     }

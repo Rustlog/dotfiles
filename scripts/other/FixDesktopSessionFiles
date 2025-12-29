@@ -61,7 +61,7 @@ Exec=env XDG_SESSION_TYPE=wayland \
     QT_QPA_PLATFORM=wayland \
     XDG_DESKTOP_PORTAL_BACKEND=wlr \
     GTK_THEME=Breeze:dark \
-    QT_QPA_PLATFORMTHEME="" startplasma-wayland
+    QT_QPA_PLATFORMTHEME= startplasma-wayland
 TryExec=/usr/bin/startplasma-wayland
 Keywords=plasma;kde;
 
@@ -137,30 +137,32 @@ EOF
 }
 
 function RestoreWaylandDesktopFiles() {
-    for session_file in /usr/share/wayland-sessions/*; do
+    cd /usr/share/wayland-sessions/ || \
+        { log error "Failed to chdir to '/usr/share/wayland-sessions/'"; return 1; }
+    for session_file in ./*; do
         case "${session_file}" in
-            *classic*|*uwsm*|gnome.*)
+            ./classic*|./*uwsm*|./gnome.*)
                 sudo rm -f "${session_file}"
             ;;
         esac
 
         case "${session_file}" in
-            *sway.desktop)
+            ./sway.desktop)
                 { Wayland_sway_desktop "${session_file}" && \
                     log info "Fixed sway (Wayland) desktop session file: '${session_file}'"; } || \
                     log error "Failed to fix '${session_file}'"
                 ;;
-            *hyprland.desktop)
+            ./hyprland.desktop)
                 { Wayland_hyprland_desktop "${session_file}" && \
                     log info "Fixed hyprland (Wayland) desktop session file: '${session_file}'"; } || \
                     log error "Failed to fix '${session_file}'"
                 ;;
-            *plasma.desktop)
+            ./plasma.desktop)
                 { Wayland_plasma_desktop "${session_file}" && \
                     log info "Fixed plasma (Wayland) desktop session file: '${session_file}'"; } || \
                     log error "Failed to fix '${session_file}'"
                 ;;
-            *gnome-wayland.desktop)
+            ./*gnome-wayland.*)
                 { Wayland_gnome_desktop "${session_file}" && \
                     log info "Fixed gnome (Wayland) desktop session file: /usr/share/wayland-sessions/${session_file}"; } || \
                     log error "Failed to fix '${session_file}'"
@@ -171,25 +173,27 @@ function RestoreWaylandDesktopFiles() {
 
 
 function RestoreX11DesktopFiles() {
-    for session_file in /usr/share/xsessions/*; do
+    cd /usr/share/xsessions/ || \
+        { log error "Failed to chdir to '/usr/share/xsessions/'"; return 1; }
+    for session_file in ./*; do
         case "${session_file}" in
-            *classic*|*gnome-*|*with*)
+            ./*classic*|*gnome-*|*with*)
                 sudo rm -f "${session_file}"
                 ;;
         esac
 
         case "${session_file}" in
-            *i3.desktop)
+            ./*i3.desktop)
                 { X11_i3_desktop "${session_file}" && \
                     log info "Fixed i3 (X11) desktop session file: '${session_file}'"; } || \
                     log error "Failed to fix '${session_file}'"
                 ;;
-            *plasmax11.desktop)
+            ./*plasmax11.desktop)
                 { X11_plasma_desktop "${session_file}" && \
                     log info "Fixed plasma (X11) desktop session file: '${session_file}'"; } || \
                     log error "Failed to fix '${session_file}'"
                 ;;
-            *gnome.desktop)
+            ./*gnome.desktop)
                 { X11_gnome_desktop "${session_file}" && \
                     log info "Fixed gnome (X11) desktop session file: '${session_file}'"; } || \
                     log error "Failed to fix '${session_file}'"
