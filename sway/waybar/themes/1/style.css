@@ -7,14 +7,14 @@
 @define-color text_main          #FFFFFF;                 /* Default text in waybar */
 @define-color text_dim           #888888;                 /* Inactive/dim text (separators) */
 @define-color accent_purple      #8810DD;                 /* Hover accents */
-@define-color focused_shadow     #222222;                 /* Focused borders */
+@define-color focused_shadow     rgba(33, 33, 33, 0.4);                 /* Focused borders */
 @define-color urgent_bg          #EB4D4B;                 /* Urgent alerts */
 @define-color cava_purple        #AA00FF;                 /* Cava animation */
 @define-color launcher_fg        #FFFFAA;                 /* Launcher text */
 @define-color launcher_bg        rgba(80, 80, 180, 0.2);  /* Launcher bg */
 @define-color battery_good       #FFBBBB;                 /* Battery > good*/
 @define-color battery_warning    #FF2222;                 /* Battery warning */
-@define-color battery_critical   #F53C3C;                 /* Battery critical bg */
+@define-color battery_critical   rgba(200, 0, 0, 0.1);    /* Battery critical bg */
 @define-color battery_blink_from rgba(224, 48, 42, 1);
 @define-color battery_blink_to   rgba(222, 95, 122, 1);
 @define-color pp_performance     #F53C3C;                 /* Power profiles */
@@ -64,11 +64,12 @@
 /* Common module styling with border-bottom */
 #language, #clock, #cpu, #memory, #temperature, #battery,
 #network, #pulseaudio, #backlight, #disk, #idle_inhibitor, #tray {
-    padding: 0 10px;
-    margin: 0 2px;
-    border-bottom: 2px solid transparent;
+    padding: 0px 6px;
+    margin: 0px 2px;
+    border-top: 0px solid transparent;
+    border-bottom: 1px solid transparent;
     background-color: transparent;
-    margin: 0 0px;
+    margin: 0px 0px;
 }
 
 /* ============= */
@@ -100,7 +101,7 @@ window#waybar.chromium { background-color: #000000; border: none; }
 /* =================== */
 
 #workspaces {
-    box-shadow: inset 0px 0px 2px 2px rgba(0, 0, 0, 0);
+    box-shadow: inset 0px 0px 2px 2px rgba(255, 255, 255, 0);
 }
 
 .modules-left > widget:first-child > #workspaces { margin-left: 0; }
@@ -115,12 +116,15 @@ window#waybar.chromium { background-color: #000000; border: none; }
 }
 
 #workspaces button:hover {
-    background: rgba(1, 1, 1, 0.2);
+    background: rgba(10, 10, 10, 0.4);
+    border-radius: 18px;
     box-shadow: inherit;
 }
 
 #workspaces button.focused {
     color: @text_dim;
+    background-color: @focused_shadow;
+    border-radius: 18px;
     box-shadow: inset 0px 0px 2px 2px @focused_shadow;
 }
 
@@ -204,23 +208,27 @@ menuitem:disabled {
 }
 
 /* Cava visualizer animation */
+
+@keyframes cava_Blink {
+    0%   { color: @cava_purple ; opacity: 1; }
+    40%  { color: #FFB4B4 ; opacity: 0.6; }
+    50%  { color: #AFA9FF ; opacity: 0.6; }
+    60%  { color: #FFE4A4 ; opacity: 0.6; }
+    100% { color: @cava_purple ; opacity: 1; }
+}
+
 #custom-cava.active {
     color: @cava_purple;
     animation-name: cava_Blink;
-    animation-duration: 4s;
+    animation-duration: 1s;
     animation-timing-function: ease;
     animation-iteration-count: infinite;
     animation-direction: reverse;
 }
 
 #custom-cava.inactive {
-    opacity: 1;
+    opacity: 0;
     color: transparent;
-}
-
-@keyframes cava_Blink {
-    0%   { color: @cava_purple; opacity: 1; }
-    100% { color: @cava_purple; opacity: 1; }
 }
 
 /* ===================== */
@@ -300,8 +308,6 @@ menuitem:disabled {
 #battery.critical:not(.charging) {
     color: @battery_warning;
     background-color: @battery_critical;
-    padding: 0px 5px;
-    margin: 4px;
     min-width: 16px;
     border-radius: 8%;
     animation-name: blink;

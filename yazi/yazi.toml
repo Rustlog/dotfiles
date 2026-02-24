@@ -8,7 +8,7 @@ bat_cat = [
     { run = '{ bat --paging=never --theme-dark=TwoDark --decorations=never --color=always -- "$@" | less -c -; } || less -c -- "$@"', desc = "Pager (bat|less)", block = true, for = "unix" },
 ]
 open_pdf = [
-    { run = 'okular "$@" & disown',                         desc = "Okular", for = "unix" },
+    { run = 'okular "$@" &',                         desc = "Okular", for = "unix" },
 ]
 imv_feh = [
     { run = 'command -v imv && viewer=imv || viewer=feh; ${viewer} -- "$@" &',                   desc = "Open Image", block = false, for = "unix" },

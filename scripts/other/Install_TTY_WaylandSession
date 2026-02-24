@@ -10,7 +10,7 @@ function log() {
 function Usage() {
     cat << EOF
 
-    Usage: ${0##*/} --install [sway|hyprland]
+    Usage: ${0##*/} [sway|hyprland]
 
     Desc:
         Configure dbus session and starts pipewire
@@ -31,14 +31,19 @@ function InstallSwayLauncher() {
 cd ~ || exit 1
 
 kill_processes() {
-    pkill -u "\$(id -u)" -f 'pipewire|wireplumber|pipewire-pulse|cava -p|socat -u UNIX' 2> /dev/null
+    pkill -u "\$(id -u)" -f \\
+        'pipewire|wireplumber|pipewire-pulse|cava -p|socat -u UNIX' \\
+            2> /dev/null
 }
 
 kill_processes
 
+HOME="\${HOME:-\$(printf ~)}"
 XDG_SESSION_TYPE=wayland
 XDG_CURRENT_DESKTOP=sway
-XDG_DESKTOP_SESSION=sway
+XDG_SESSION_DESKTOP=sway
+XDG_DATA_HOME=\$HOME/.local/share
+XDG_CONFIG_HOME=\$HOME/.config
 XDG_RUNTIME_DIR=/run/user/"\$(id -u)"
 PIPEWIRE_RUNTIME_DIR=/run/user/"\$(id -u)"
 QT_QPA_PLATFORMTHEME=qt6ct
@@ -46,11 +51,17 @@ WLR_RENDERER=vulkan
 
 DBUS_SOCKET_ADDR="\${XDG_RUNTIME_DIR}/dbus-sway"
 
-pkill -u "\$(id -u)" -f "dbus-daemon --session .* --address=unix:path=\${DBUS_SOCKET_ADDR}" &
+pkill -u "\$(id -u)" -f \\
+    "dbus-daemon --session .* --address=unix:path=\${DBUS_SOCKET_ADDR}" &
 wait \$!
 
-stat -c '%F' "\${DBUS_SOCKET_ADDR}" 1> /dev/null 2>&1 | grep socket 1> /dev/null 2>&1 || \\
-    DBUS_SOCKET="\$(dbus-daemon --session --fork --nopidfile --print-address=1 --address=unix:path="\${DBUS_SOCKET_ADDR}")"
+stat -c '%F' "\${DBUS_SOCKET_ADDR}" 1> /dev/null 2>&1 | \\
+    grep socket 1> /dev/null 2>&1 || \\
+        DBUS_SOCKET="\$( \\
+            dbus-daemon --session --fork \\
+                --nopidfile --print-address=1 \\
+                --address=unix:path="\${DBUS_SOCKET_ADDR}" \\
+        )"
 
 DBUS_SESSION_BUS_ADDRESS="\${DBUS_SOCKET}"
 
@@ -58,16 +69,14 @@ set -- "--config" "\${HOME}/.config/sway/config"
 
 lsmod | grep nvidia 1> /dev/null 2>&1 && set -- "\${@}" "--unsupported-gpu"
 
-export XDG_DESKTOP_SESSION XDG_RUNTIME_DIR XDG_SESSION_TYPE \\
+export XDG_SESSION_DESKTOP XDG_RUNTIME_DIR XDG_SESSION_TYPE \\
     XDG_CURRENT_DESKTOP DBUS_SESSION_BUS_ADDRESS \\
-    PIPEWIRE_RUNTIME_DIR QT_QPA_PLATFORMTHEME WLR_RENDERER
+    PIPEWIRE_RUNTIME_DIR QT_QPA_PLATFORMTHEME WLR_RENDERER \\
+    XDG_CONFIG_HOME XDG_DATA_HOME
 
 pipewire 1> /dev/null 2>&1 &
 
-# shellcheck disable=SC2093
 exec sway "\${@}"
-
-kill_processes
 
 EOF
     then
@@ -105,12 +114,16 @@ function InstallHyprlandLauncher() {
 cd ~ || exit 1
 
 kill_processes() {
-    pkill -u "\$(id -u)" -f 'pipewire|wireplumber|pipewire-pulse|cava -p|socat -u UNIX' 2> /dev/null
+    pkill -u "\$(id -u)" -f \\
+        'pipewire|wireplumber|pipewire-pulse|cava -p|socat -u UNIX' \\
+            2> /dev/null
 }
 
 kill_processes
 
 XDG_SESSION_TYPE=wayland
+XDG_CONFIG_HOME=\$HOME/.config
+XDG_DATA_HOME=\$HOME/.local/share
 XDG_RUNTIME_DIR=/run/user/"\$(id -u)"
 PIPEWIRE_RUNTIME_DIR=/run/user/"\$(id -u)"
 QT_QPA_PLATFORMTHEME=qt6ct
@@ -118,11 +131,17 @@ WLR_RENDERER=vulkan
 
 DBUS_SOCKET_ADDR="\${XDG_RUNTIME_DIR}/dbus-Hyprland"
 
-pkill -u "\$(id -u)" -f "dbus-daemon --session .* --address=unix:path=\${DBUS_SOCKET_ADDR}" &
+pkill -u "\$(id -u)" -f \\
+    "dbus-daemon --session .* --address=unix:path=\${DBUS_SOCKET_ADDR}" &
 wait \$!
 
-stat -c '%F' "\${DBUS_SOCKET_ADDR}" 1> /dev/null 2>&1 | grep socket 1> /dev/null 2>&1 || \\
-    DBUS_SOCKET="\$(dbus-daemon --session --fork --nopidfile --print-address=1 --address=unix:path="\${DBUS_SOCKET_ADDR}")"
+stat -c '%F' "\${DBUS_SOCKET_ADDR}" 1> /dev/null 2>&1 | \\
+    grep socket 1> /dev/null 2>&1 || \\
+        DBUS_SOCKET="\$( \\
+            dbus-daemon --session --fork \\
+                --nopidfile --print-address=1 \\
+                --address=unix:path="\${DBUS_SOCKET_ADDR}" \\
+        )"
 
 DBUS_SESSION_BUS_ADDRESS="\${DBUS_SOCKET}"
 
@@ -130,9 +149,10 @@ set -- "--config" "\${HOME}/.config/hypr/hyprland.conf"
 
 export XDG_SESSION_TYPE XDG_RUNTIME_DIR \\
     PIPEWIRE_RUNTIME_DIR QT_QPA_PLATFORMTHEME \\
-    WLR_RENDERER DBUS_SESSION_BUS_ADDRESS
+    WLR_RENDERER DBUS_SESSION_BUS_ADDRESS \\
+    XDG_CONFIG_HOME XDG_DATA_HOME
 
-pipewire 1> /dev/null 2>&1 & sleep 0.4
+pipewire 1> /dev/null 2>&1 &
 
 exec Hyprland "\${@}"
 

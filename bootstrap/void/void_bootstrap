@@ -38,9 +38,9 @@ function XBPS_install() {
 
     log info "Packages will be installed: ${Install_Tool_list[*]}"
 
-    [[ ${#Install_Tool_list[@]} -eq 0 ]] && return 1
+    [[ "${#Install_Tool_list[@]}" -eq 0 ]] && return 1
 
-    [[ $force_reinstall -eq 1 ]] && xbps_cmd_args+=( -f )
+    [[ "$FORCE" -eq 1 ]] && xbps_cmd_args+=( -f )
 
     if sudo xbps-install "${xbps_cmd_args[@]}" "${Install_Tool_list[@]}"; then
         log info "Installed: '${Install_Tool_list[*]}'"
@@ -50,12 +50,12 @@ function XBPS_install() {
 }
 
 function Usage() {
-    local this_script="${0##*/}"
+    local n="${0##*/}"
     cat << EOF
     Usage:
         Usage of script:
-            ${this_script} -i,--install [PACKAGE_GROUP|all]
-            ${this_script} -i,--install -s,--service=SERVICE1,SERVICE2,...
+            ${n} -i,--install [PACKAGE_GROUP|all]
+            ${n} -i,--install -s,--service=SERVICE1,SERVICE2,...
         Available groups:
             graphics:           drivers: (nvidia,amd), Compute APIs: (vulkan,opengl)
             browsers:           qutebrowser, and opera
@@ -96,13 +96,14 @@ function Check_deps() {
     local -a pkgs=("$@")
     for pkg in "${pkgs[@]}"; do
         if ! xbps-query "${pkg}" &> /dev/null; then
-            log error "Failed to satisfy dependency '${pkg}'"
-            local yes_no
-            printf '%s' 'Should Install this package y(es)|n(o) or q(uit)?: '; read -r -n1 yes_no; printf '\n'
-            if [[ "${yes_no}" =~ ^(Y|y)$ ]]; then
-                sudo xbps-install -y "${pkg}"
-                continue
+            if [[ "${FORCE}" -eq 0 ]];then
+                log warn "Failed to satisfy dependency '${pkg}'"
+                local yes_no; printf '%s' "Install '${pkg}' package y(es)|n(o) or q(uit)?: "
+                read -r -n1 yes_no; printf '\n'
             fi
+            [[ "${yes_no}" =~ ^(Y|y)$ ]] || continue
+            sudo xbps-install -y "${pkg}"
+            continue
             return 1
         fi
     done
@@ -335,8 +336,7 @@ function SRC_build_nbfc_fancontrol() {
         git clone --depth=1 "${url}" "${clone_dir}"
     fi
 
-    git clone --depth=1 "${url}" "${clone_dir}"
-    cd "${clone_dir}" || log error "Failed to cd '${clone_dir}'"
+    cd "${clone_dir}" || log error "Failed to chdir to '${clone_dir}'"
     { ./autogen.sh && ./configure --prefix=/usr --sysconfdir=/etc && make && sudo make install; } || \
         { log error "Failed to build nbfc-linux"; cd - &> /dev/null; return 1; }
     cd - &> /dev/null
@@ -533,6 +533,7 @@ EOF
 function Install_limactl() {
     local version=""
     version="$(curl -fsSL https://api.github.com/repos/lima-vm/lima/releases/latest | jq -r .tag_name)"
+    sudo -v
     curl -f#SLC- "https://github.com/lima-vm/lima/releases/download/${version}/lima-${version:1}-$(uname -s)-$(uname -m).tar.gz" | sudo tar Cxzvm "/usr/local/"
     curl -f#SLC- "https://github.com/lima-vm/lima/releases/download/${version}/lima-additional-guestagents-${version:1}-$(uname -s)-$(uname -m).tar.gz" | sudo tar Cxzvm "/usr/local/"
 }
@@ -555,7 +556,7 @@ function Neovim_setup() {
 }
 
 function Install_graphics_tools() {
-    MSG="Video Graphics drivers (Nvidia + Amd)"
+    MSG="video graphics drivers (Nvidia + Amd)"
     local -a XBPSPkgs=(
         # Nvidia
         nvidia nvidia-firmware nvidia-vaapi-driver
@@ -575,12 +576,25 @@ function Install_graphics_tools() {
         vkBasalt
         linux-tools
     )
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
+}
+
+function Install_extra_repos() {
+    MSG="add extra repos"
+    local -a XBPSPkgs=(
+        void-repo-nonfree
+        void-repo-multilib
+        void-repo-multilib-nonfree
+    )
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function locale-gen() {
     local locale="${1}"
     IFS=$'.' read -r lang enc <<< "${locale}"
+    log info "setting up locale"
     sudo localedef -i "${lang}" -f "${enc}" "${lang}.${enc}"
 }
 
@@ -606,60 +620,65 @@ function Install_static_ffmpeg() {
 }
 
 function Install_browsers() {
-    MSG="Browsers"
+    MSG="web browsers"
     local -a XBPSPkgs=(
         qutebrowser python3-adblock
         opera tor
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_terminals() {
-    MSG="Terminal emulators"
+    MSG="terminal emulators"
     local -a XBPSPkgs=(
-        alacritty foot
+        alacritty foot xterm
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_Audio() {
-    MSG="Audio drivers"
+    MSG="audio drivers and utils"
     local -a XBPSPkgs=(
         alsa-firmware alsa-tools alsa-utils
         pipewire alsa-pipewire libjack-pipewire
-        pavucontrol cava
+        pavucontrol cava elisa mpd rtkit
         easyeffects calf lsp-plugins
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
     Enable_service rtkit
     Enable_pipewire_configs
 }
 
 function Install_monitors() {
-    MSG="Network monitoring tools"
+    MSG="network monitoring tools"
     local -a XBPSPkgs=(
         htop iftop btop nmon nvtop
-        powertop
+        powertop tlp
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
     Enable_service tlp
 }
 
 function DataBase_management() {
-    MSG="Utils"
+    MSG="database management tools"
     local -a XBPSPkgs=(
         postgresql mysql
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_dev_tools() {
-    MSG="Utils"
+    MSG="dev build tools"
     local -a XBPSPkgs=(
         # development tools
         base-devel
@@ -672,30 +691,33 @@ function Install_dev_tools() {
         clang-tools-extra # for clangd
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_term_filemanagers() {
-    MSG="Terminal File managers"
+    MSG="terminal file managers"
     local -a XBPSPkgs=(
         yazi vifm ranger nautilus dolphin konsole
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_sway_setup() {
-    MSG="Install sway"
+    MSG="install sway"
     local -a XBPSPkgs=(
         sway swayidle swaylock xinit swww
         wayland xorg-server-xwayland xorg-server
         Waybar grim slurp wl-clipboard wf-recorder
         fuzzel autotiling okular
-        hyprlock
+        # hyprlock
         socat # unix socket
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_hyprland() {
@@ -706,14 +728,15 @@ function Install_hyprland() {
     printf '%s\n' "${repo_url}" | sudo tee "${hyprland_repo}" &> /dev/null
     log info "Updating and adding hyprland repo"
     sudo xbps-install -S
-    MSG="Install hyprland"
+    MSG="hyprland"
     local -a XBPSPkgs=(
         hyprland hyprland-qtutils
         hyprland-qt-support hyprland-protocols
         xdg-desktop-portal-hyprland swww
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_fonts_and_themes() {
@@ -724,17 +747,19 @@ function Install_fonts_and_themes() {
         qt6ct breeze-gtk breeze-qt6 # theme
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_productivity() {
-    MSG="Extras"
+    MSG="graphics productivity"
     local -a XBPSPkgs=(
         blender krita gimp libreoffice-base
         kdenlive obs sublime-text4
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_QEMU() {
@@ -744,11 +769,12 @@ function Install_QEMU() {
         qemu-img
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_misc_tools() {
-    MSG="Miscellaneous Tools"
+    MSG="miscellaneous tools"
     local -a XBPSPkgs=(
         apache nginx
         acpid dhclient inxi
@@ -756,6 +782,7 @@ function Install_misc_tools() {
         xorg-server xorg-server-xwayland
         feh imv mpv mpv-mpris vlc
         wlr-randr pastel
+        kclock
         guvcview
         shellcheck
         vsv sv-helper # runit helpers
@@ -765,7 +792,8 @@ function Install_misc_tools() {
         net-tools
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 
     # enable services
     # Enable_service acpid
@@ -780,24 +808,26 @@ function Install_misc_tools() {
 }
 
 function Install_pentest_and_sec() {
-    MSG="Utils"
+    MSG="pentest and security utils"
     local -a XBPSPkgs=(
         nmap metasploit hydra john sqlmap
         nikto dirb gobuster ffuf
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
 function Install_Greeter() {
-    MSG="Utils"
+    MSG="greeter"
     local -a XBPSPkgs=(
         greetd # greeter daemon
         tuigreet # TUI UI
         fbterm
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 
     # greetd + tuigreet setup
 
@@ -817,36 +847,40 @@ user = "_greeter"
 EOF
 
     # Enable_service greetd
-    log info "Enable greetd 'sudo ln -s /etc/sv/greetd /var/service/'"
-
+    log info "to enable greetd: sudo ln -s /etc/sv/greetd /var/service/"
 }
 
 function Install_utils() {
-    MSG="Utils"
+    MSG="necessary utils"
     local -a XBPSPkgs=(
         zip brightnessctl dust gdu tree procs firejail
-        tmux rsync dnsmasq hostapd polkit elogind nftables
+        tmux tmate rsync dnsmasq hostapd polkit elogind nftables
         zsh zsh-syntax-highlighting bash-completion openvpn zbar cronie zstd
         bat eza fzf jq lesspipe lsd micro ncdu neovim nodejs ripgrep
         fuse-sshfs lsof rsyslog plymouth man-db mlocate ngetty
         xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
         chafa numactl fbterm frp cryptsetup jless
-        filelight
+        filelight 7zip
         keypunch fd
         vmpk # virtual piano
         spek-x sonic-visualiser # audio visualizers
         cutter # a advanced debugger/disassembler
         man-pages-devel man-pages-posix # docs for C and POSIX
         libwebp-tools # cwewp
-        ImageMagic NetworkManager network-manager-applet # Network Manager
+        ImageMagick NetworkManager network-manager-applet # Network Manager
         wireless_tools # for iwlist
         tldr # simple summary of commands
         bind-utils # Dig
         chrony # time
         mako # Notification daemon
+        exfatprogs exfat-utils # exfat utils
+        e2fsprogs # ext2/ext3/ext4 (default linux)
+        ntfs-3g   # ntfs support
+        dosfstools # fat32
     )
 
-    XBPS_install "${MSG}" "${XBPSPkgs[@]}"
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
 
     sudo touch /etc/nftables.conf
     Enable_service NetworkManager
@@ -879,7 +913,7 @@ function Install_service() {
 function main() {
     local -a args=("${@}")
     local -g static_install_dir="/opt/static"
-    local -g force_reinstall=0 install=0
+    local -g install=0
     local -i update_system=1
     local install_service_name=""
 
@@ -893,7 +927,7 @@ function main() {
         fi
         if [[ "${arg}" == -* ]]; then
             case "${arg}" in
-                -f|-*force) force_reinstall=1 ;;
+                -f|-*force) FORCE=1 ;;
                 -i|-*install) install=1 ;;
                 -s|-*service) install_service_name="${value}" ;;
                 --no[-_]update|--skip[-_]update) update_system=0 ;;
@@ -907,8 +941,8 @@ function main() {
     [[ -n "${install_service_name}" ]] && \
         { Install_service "${install_service_name}"; return 0; }
 
-    if [[ $update_system -eq 1 ]]; then
-        log beautify "Just a system update"
+    if [[ "$update_system" -eq 1 ]]; then
+        log beautify "system update"
         sudo xbps-install -Su
     fi
 
@@ -929,7 +963,7 @@ function main() {
             sway) Install_sway_setup ;;
             misc) Install_misc_tools ;;
             nvim|neovim) Neovim_setup ;;
-            *brew) Install_brew_pkg_manager ;;
+	        *brew) Install_brew_pkg_manager ;;
             dev*) Install_dev_tools ;;
             prod*) Install_productivity ;;
             data*) DataBase_management ;;
@@ -946,6 +980,7 @@ function main() {
                 Install_hyprland
                 ;;
             all|essential*)
+                Install_extra_repos
                 Install_graphics_tools
                 Install_browsers
                 Install_terminals
@@ -960,9 +995,9 @@ function main() {
                 Install_fonts_and_themes
                 Install_AdGuardHome
                 Install_yt_dlp
-                Install_brew_pkg_manager
+                # Install_brew_pkg_manager
                 Install_VTconsole_font
-                SRC_build_ly_loginmanager
+                # SRC_build_ly_loginmanager
                 SRC_build_nbfc_fancontrol
                 ;;
             [A-Za-z]*) log error "Unknown module: ${arg}" ;;

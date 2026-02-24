@@ -32,11 +32,11 @@ builtin readonly VERSION AUTHOR LICENSE REMOTE_REPO
 
 # Global readonly vars
 ACCESS_GROUP="qvmctl"
-THIS_SCRIPT_NAME="${0##*/}"
-D_CONFIG_DIR="${HOME}/.config/custom/${THIS_SCRIPT_NAME,,}"
+PROGRAM_NAME="${0##*/}"
+D_CONFIG_DIR="${HOME}/.config/${PROGRAM_NAME,,}"
 D_STATE_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID:-$(id -u)}}/${ACCESS_GROUP}"
 
-builtin readonly ACCESS_GROUP THIS_SCRIPT_NAME D_CONFIG_DIR D_STATE_RUNTIME_DIR
+builtin readonly ACCESS_GROUP PROGRAM_NAME D_CONFIG_DIR D_STATE_RUNTIME_DIR
 
 # Global mutable vars
 PROFILE_NAME=""
@@ -46,13 +46,30 @@ SOCK_FILE=""
 LOG_FILE=""
 NO_COLOR=1
 VERBOSE=0
+LOGLEVEL=2
 IFS=$' '
 
 # Pretty logger
 function log() {
     local _type="${1}"; shift
     local _color="" _t="" _exit_code=0
-    if [[ $NO_COLOR -eq 0 ]] && [[ -t 1 ]]; then
+    local default_loglevel=2 severity=0
+
+    local -A loglevel=(
+        [error]=1
+        [warn]=1
+        [fatal]=1
+        [cmd_error]=1
+        [info]=2
+        [cmd_info]=2
+        [debug]=3
+    )
+
+    severity="${loglevel[$_type]:-${default_loglevel}}"
+
+    (( LOGLEVEL >= severity )) || return 0
+
+    if [[ "$NO_COLOR" -eq 0 ]]; then
         local -g _info_color="\033[38;2;85;255;126m" \
             _warn_color="\033[38;2;255;170;10m" \
             _error_color="\033[38;2;244;29;31m" \
@@ -63,6 +80,7 @@ function log() {
         _info_color="" _warn_color="" _error_color=""
         _fatal_color="" _other_color="" _nc=""
     fi
+
     case "${_type}" in
         info) _color="${_info_color:-}" _t="*"                ;;
         warn) _color="${_warn_color:-}" _t="^"                ;;
@@ -83,9 +101,9 @@ function log() {
 
 # Show user real USAGE
 function ShowUsage() {
-    local n="${THIS_SCRIPT_NAME}"
+    local n="${PROGRAM_NAME}"
     printf '%b\n' \
-        "usage: ${THIS_SCRIPT_NAME} [OPTIONS] [[PROFILES],override=value ...]" \
+        "usage: ${PROGRAM_NAME} [OPTIONS] [[PROFILES],override=value ...]" \
         "options:" \
         "   -lp,--list-profiles    list available" \
         "   -lr,--list-running     list running VMs" \
@@ -374,8 +392,8 @@ EOF
 # List available profiles
 function ListProfiles() {
     require_var "$(find "${D_CONFIG_DIR}" -type f -print -quit 2> /dev/null)" || \
-        { log warn "No profiles available in directory"; return 0; }
-    printf '%s\n' "Available profiles at '$(ColorPath "${D_CONFIG_DIR}")/*'"
+        { log warn "no profiles available in directory (${D_CONFIG_DIR})"; return 0; }
+    printf '%s\n' "available profiles at '$(ColorPath "${D_CONFIG_DIR}")/*'"
     for profile in "${D_CONFIG_DIR}"/*; do
         require_file "${profile}" || continue
         printf '    %-20b = %s\n' \
@@ -454,8 +472,7 @@ function ListRunning() {
 function KillRunningVM() {
     local profile_name_="${1:-}"
     local pid_="" name_="" state_file=""
-    local -a _arr=()
-    local -a t_arr=()
+    local -a _arr=() t_arr=()
     state_file="${D_STATE_RUNTIME_DIR}/${profile_name_}/state"
     [[ -s "${state_file}" ]] || return 1
     mapfile -t _arr < "${state_file}"
@@ -470,11 +487,12 @@ function KillRunningVM() {
         log info "Killed '${pid_}' -> '${profile_name_}'"
         sed -i "/${pid_}/d" "${state_file}"
         if [[ ! -s "${state_file}" && -f "${state_file}" ]]; then
-            cd "${D_STATE_RUNTIME_DIR}/${profile_name_}" || return 1
+            cd "${D_STATE_RUNTIME_DIR}/${profile_name_}" || { log error \
+                "failed chdir to '${D_STATE_RUNTIME_DIR}/${profile_name_}'"; return 1; }
             rm -f ./state
         fi
-        (sleep 0.4 && rmdir "${D_STATE_RUNTIME_DIR}/${profile_name_}" \
-            2>/dev/null || true) &
+        (sleep 0.4 && { rmdir "${D_STATE_RUNTIME_DIR}/${profile_name_}" \
+            2>/dev/null || true; }) & disown
     done
 }
 
@@ -839,6 +857,15 @@ function main() {
     DEFAULT_GUEST_CPU_MODEL=""
     DEFAULT_RAM=""
 
+    consume_val() {
+        local -n variable_ref=${1}
+        local value="${2:-}"
+        local -n index_ref=${3}
+        [[ -n "${value}" ]] || return 1
+        variable_ref="${value}"
+        index_ref=$((index_ref+1))
+    }
+
     for ((i=0;i<${#args[@]};i++)); do
         arg="${args[$i]}" m=0
         case "${arg}" in
@@ -858,7 +885,7 @@ function main() {
             --about)                    ShowInfo about; return 0    ;;
         esac
 
-        is_flag_enabled "$m" && continue
+        is_flag_enabled "$m" || continue
 
         [[ -n "${args[i+1]:-}" && "${args[i+1]:-}" != -* ]] && \
             value="${args[i+1]:-}" i=$((i+1))
@@ -874,41 +901,41 @@ function main() {
             --iso|--cd)                 iso_path="${value}"         ;;
             -d|--delete)
                 delete_profile=1;
-                require_var "${value}" && profile="${value}"        ;;
+                consume_val profile "${value}" i                    ;;
             --cat)
                 cat_profile=1;
-                require_var "${value}" && profile="${value}"        ;;
+                consume_val profile "${value}" i                    ;;
             -k|--kill)
                 kill_running_vm=1;
-                require_var "${value}" && profile="${value}"        ;;
+                consume_val profile "${value}" i                    ;;
             -e|--edit)
-                edit_profile=1; require_var "${value}" && \
-                    profile="${value}"                              ;;
-            --log*)
-                { require_var "${value}" && \
-                    profile="${value}"; } || log error \
-                        "Cannot query logs no profile given"
+                edit_profile=1; consume_val profile "${value}" i    ;;
+            --loglevel)
+                LOGLEVEL="${value:-2}"
+                ;;
+            --logs)
+                consume_val profile "${value}" i || log error \
+                    "Cannot query logs no profile given"
                 AttachToLog "${profile}"                            ;;
             -s|--shutdown)
-                { require_var "${value}" && \
-                    profile="${value}"; } || log error \
+                consume_val profile "${value}" i || log error \
                         "Cannot shutdown guest no vm specified"
                 ShutdownVM "${profile}"                             ;;
             -r|--reset)
-                { require_var "${value}" && \
-                    profile="${value}"; } || log error \
+                consume_val profile "${value}" i || log error \
                         "Cannot reset guest no vm specified"
                 ResetVM "${profile}"                                ;;
             --rename)
                 rename_profile=1
                 [[ $(( ${#args[@]} - i )) -ge 2 ]] || \
                     log error "only do: --rename 'old_name' 'new_name'"
-                require_var "${value}" && target="${value}" \
-                    target_rename="${args[i+1]:-}" i=$((i+1))     ;;
+                consume_val target "${value}" i
+                target_rename="${args[i+1]:-}"
+                RenameProfile "${target}" "${target_rename}"; return 1  ;;
             --attach)
                 [[ $(( ${#args[@]} - i )) -ge 2 ]] || \
                     log error "only do: --attach 'path_to_disk' 'node_name' [profile_name]"
-                require_var "${value}" && disk_path="${value%,*}" \
+                consume_val disk_path "${value%,*}" i; \
                     node_name="${args[i+1]:-}" i=$((i+1))
                 [[ -n "${value}" && "${args[i+1]:-}" != -* ]] && \
                     profile="${args[i+1]:-}" i=$((i+1))
@@ -1062,12 +1089,15 @@ function main() {
         # Read & Validate profile
         ValidateProfile
 
-        # Override QEMU args
+        # Override QEMU args & reset values
         is_flag_enabled "$override_boot_flag" && BOOT_FROM_ISO[0]=1 override_boot_flag=0
-        is_flag_enabled "$override_kvm_flag" && GUEST_ACCEL[0]="$override_kvm_flag"
-        require_var "${override_guest_memory}" && GUEST_MEMORY[0]="${override_guest_memory}"
-        require_var "${override_guest_networking}" && GUEST_NETWORK[0]="${override_guest_networking}"
-        require_var "${override_guest_cpu_model}" && GUEST_CPU_MODEL[0]="${override_guest_cpu_model}"
+        is_flag_enabled "$override_kvm_flag" && GUEST_ACCEL[0]=1 override_kvm_flag=0
+        require_var "${override_guest_memory}" && \
+            GUEST_MEMORY[0]="${override_guest_memory}" override_guest_memory=""
+        require_var "${override_guest_networking}" && \
+            GUEST_NETWORK[0]="${override_guest_networking}" override_guest_networking=""
+        require_var "${override_guest_cpu_model}" && \
+            GUEST_CPU_MODEL[0]="${override_guest_cpu_model}" override_guest_cpu_model=""
 
         # Start bulding QEMU
         BuildArgs qemu_args "$i"

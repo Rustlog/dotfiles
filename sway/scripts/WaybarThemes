@@ -24,7 +24,7 @@ function toggle_theme() {
     if [[ $found_swww -eq 1 ]]; then
         swww img "${background_img}" --transition-type fade --transition-duration 1
     else
-        swaybg -o '*' -i "${background_img}" -m fill
+        swaybg -o '*' -i "${background_img}" -m fill &>/dev/null &
     fi
 
     if ! pgrep -f "waybar -c ${current_waybar_config} -s ${current_waybar_style}" &> /dev/null; then

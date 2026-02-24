@@ -4,6 +4,7 @@ all:
 	fedora-dev ubuntu-server fedora-server
 
 fedora-dev:
+	mkdir -p build-context
 	podman build -t fedora-dev:latest -f dockerfiles/Dockerfile.fedora-dev build-context/
 	podman run -dt --init --init-path /usr/bin/tini --name fedora-dev --hostname fedora-container -p 8026:22 -p 6084:80 -p 6447:443 localhost/fedora-dev:latest /usr/bin/tini -- /usr/bin/bash
 	podman exec -it fedora-dev bash

@@ -64,7 +64,7 @@
 /* Module-specific colors */
 @define-color workspaces-color @foreground;
 @define-color workspaces-focused-bg @green;
-@define-color workspaces-focused-fg @cyan;
+@define-color workspaces-focused-fg rgba(200, 200, 200, 0.8);
 @define-color workspaces-urgent-bg @red;
 @define-color workspaces-urgent-fg @black;
 @define-color cava_purple #AA00FF;
@@ -116,19 +116,19 @@ window#waybar {
 /* Common module styling with border-bottom */
 #language, #clock, #cpu, #memory, #temperature, #battery,
 #network, #pulseaudio, #backlight, #disk, #idle_inhibitor, #tray {
-    padding: 0 10px;
-    margin: 0 2px;
-    border-bottom: 2px solid transparent;
+    padding: 0px 8px;
+    margin: 0px 2px;
+    border-bottom: 3px solid transparent;
     background-color: transparent;
-    margin: 0 3px;
+    margin: 0px 3px;
 }
 
 /* Workspaces styling */
 #workspaces button {
-    padding: 0 8px;
+    padding: 0 3px;
     background-color: transparent;
     color: @workspaces-color;
-    margin: 0;
+    margin: 0px 4px;
 }
 
 #workspaces button:hover {

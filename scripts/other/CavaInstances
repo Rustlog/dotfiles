@@ -11,9 +11,9 @@ function KILL_CAVA() {
     done
 }
 
-function CAVA() {
-    for (( i=0 ; i < 6 ; i++ )); do
-        footclient -e "cava" &>/dev/null &
+function SPAWN_CAVA_INSTANCES() {
+    for ((i=0;i<6;i++)); do
+        footclient cava &>/dev/null &
         echo "$!" >> "${TEMP_FILE}"
         sleep "$speed"
         disown
@@ -23,6 +23,7 @@ function CAVA() {
 function main() {
     local flag="${1}"
     local foot_sock="${XDG_RUNTIME_DIR}/foot${WAYLAND_DISPLAY/#/-}.sock"
+    local -i autotiling_pid=0
 
     [[ -S "${foot_sock}" ]] || foot --server="${foot_sock}" & disown
 
@@ -31,7 +32,12 @@ function main() {
         rm -f "${TEMP_FILE}"
         return 0
     }
-    CAVA
+
+    pgrep -f autotiling &>/dev/null || \
+        { autotiling &>/dev/null & autotiling_pid="$!"; sleep 0.1; }
+
+    SPAWN_CAVA_INSTANCES
+    [[ "$autotiling_pid" -ne 0 ]] && kill "$autotiling_pid"
 }
 
 main "$@"

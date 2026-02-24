@@ -64,6 +64,17 @@ nnoremap <silent><C-Space> :NERDTreeToggle<CR>
 " Toggle wrap and nowrap with F2
 nnoremap <silent><F2> :call ToggleWrap() <CR>
 
+" Copy date & time into a register
+function! CopyDateIntoRegister()
+    let l:cmd_output = system('date +"%F %T"')
+    let l:cmd_output = trim(l:cmd_output)
+    call setreg('d', l:cmd_output)
+endfunction
+
+nnoremap <silent><leader>D :call CopyDateIntoRegister()<RETURN>
+
+nnoremap <silent><leader>cr :for r in split('abcdefghijklmnopqrstuvwxyz1234567890/-', '\zs') <BAR> call setreg(r, '') <BAR> endfor <RETURN>
+
 " Toggle wrap lines
 function! ToggleWrap()
     if &wrap
@@ -100,23 +111,25 @@ lua <<EOF
 local lazypath = "/usr/share/nvim/lazy_plugins/lazy.nvim"
 
 -- Clone it as root
-if vim.fn.getenv('UID') == 0 then
-    if vim.loop.fs_stat(lazypath) then
+-- if vim.fn.getenv("UID") == 0 then
+if (vim.uv or vim.loop).getuid() == 0 then
+    if not (vim.uv or vim.loop).fs_stat(lazypath) then
         print("Cloning lazy.nvim system-wide into /usr/share/nvim/lazy_plugins ...")
-      vim.fn.system({
-          "git", "clone", "--filter=blob:none", "--branch=stable",
-          "https://github.com/folke/lazy.nvim.git", lazypath,
-      })
-      if vim.v.shell_error ~= 0 then
-          vim.api.nvim_err_writeln("Failed to clone lazy.nvim system-wide")
-          os.exit(1)
-      end
+        vim.fn.system({
+            "git", "clone", "--depth=1", "--filter=blob:none", "--branch=stable",
+            "https://github.com/folke/lazy.nvim.git", lazypath,
+        })
+        if vim.v.shell_error ~= 0 then
+            vim.api.nvim_err_writeln("Failed to clone lazy.nvim system-wide")
+            os.exit(1)
+        end
     end
 else
-    if not vim.loop.fs_stat(lazypath) then
+    if not (vim.uv or vim.loop).fs_stat(lazypath) then
         print("Run neovim as root once to install it systemd-wide")
         print("\nPress any to exit...")
         vim.fn.getchar()
+        -- os.exit(1)
     end
 end
 

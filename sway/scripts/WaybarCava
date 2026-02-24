@@ -3,17 +3,19 @@
 builtin set -euo pipefail
 
 LOGGING=0
+PROGRAM_NAME="${0##*/}"
+WORK_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID:-$(id -u)}}/waybar/${PROGRAM_NAME}"
 
 # logger
 function log() {
     local type_="${1}"; shift
     [[ $LOGGING -eq 1 ]] && printf '[%s]: %s\n' "${type_}" "${*}" 1>&2
-    printf '[%s]: %b\n' "${type_}" "${*}" &>> "${work_dir}/waybar_.log"
+    printf '[%s]: %b\n' "${type_}" "${*}" &>> "${WORK_DIR}/waybar_.log"
 }
 
 function KILL_child_processes() {
     { pgrep -f ".*${0}" | grep -v "^$$" | xargs -r kill -SIGINT; } 2>/dev/null || true
-    { pkill -f "cava -p ${work_dir}/cava_visualizer_X_.*.fifo.*"; } 2>/dev/null || true
+    { pkill -f "cava -p ${WORK_DIR}/cava_visualizer_X_.*.fifo.*"; } 2>/dev/null || true
 }
 
 # write a fresh configuration for cava
@@ -72,8 +74,10 @@ function CleanUP() {
     local config="${2:-""}"
     local -n ref_pids=${3}
 
-    [[ -p "${pipe}" ]] && { rm -f "${pipe}" || log error "Failed to clean pipe '${pipe}'"; }
-    [[ -f "${config}" ]] && { rm -f "${config}" || log error "Failed to clean config '${config}'"; }
+    [[ -p "${pipe}" ]] && { rm -f "${pipe}" || \
+        log error "Failed to clean pipe '${pipe}'"; }
+    [[ -f "${config}" ]] && { rm -f "${config}" || \
+        log error "Failed to clean config '${config}'"; }
 
     for pid in "${ref_pids[@]}"; do
         if ps -p "${pid}" &> /dev/null; then
@@ -141,15 +145,14 @@ function ToggleBar() {
 
 function main() {
     local -a args=("${@}")
-    # global vars
-    local -g work_dir="/tmp/waybar/${0##*/}"
-    local tmp
-    # a temporary file for uniqueness
-    tmp="${work_dir}/cava_visualizer_X_$(hexdump -n2 -ve '/1 "%02x"' /dev/urandom).fifo"
+    local fifo_pipe=""
+    # a unique fifo pipe
+    fifo_pipe="${WORK_DIR}/cava_visualizer_X_$(hexdump -n2 -v --format '"%x"' /dev/urandom).fifo" || \
+        log error "command failed to run "
     # create cava config
-    local config_file="${tmp}_config"
+    local config_file="${fifo_pipe}_config"
     # output Pipe
-    local pipe="${tmp}"
+    local pipe="${fifo_pipe}"
     # ASCII characters
     local idle_cava_bar=""
     # glyph characters
@@ -162,7 +165,7 @@ function main() {
     local -i framerate=36
     # change the length of cava visualizer
     local -i bar_len=4
-    # bar style (1rd is default)
+    # bar style (1st is default)
     local -i use_bar_num=1
 
     local -a pids=()
@@ -179,7 +182,10 @@ function main() {
         esac
     done
 
-    mkdir -p "${work_dir}"
+    mkdir -p "${WORK_DIR}" || \
+        { log error "failed to create directory '${WORK_DIR}'"; return 1; }
+    chmod 0700 "${WORK_DIR}" || \
+        { log error "failed to change permissions of the directory '${WORK_DIR}'"; return 1; }
 
     KILL_child_processes
 
@@ -191,8 +197,8 @@ function main() {
 
     log info "bar num: ${use_bar_num}"
     log info "framerate: ${framerate}"
-    log info "work dir: ${work_dir}"
-    log info "log file: ${work_dir}/waybar_.log"
+    log info "work dir: ${WORK_DIR}"
+    log info "log file: ${WORK_DIR}/waybar_.log"
     log info "config file: ${config_file}"
     log info "pipe: ${pipe}"
     log info "noise level: ${noise_level}"

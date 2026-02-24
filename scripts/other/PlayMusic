@@ -20,7 +20,7 @@ declare -a SELECTED=() CURRENTLY_PLAYING=()
 QUIET=0
 DETACH=0
 
-MUSIC_DIR="${HOME}/Media/Music"
+MUSIC_DIR="${HOME}/media/music"
 
 function LOG() {
     local type_="${1}"; shift
@@ -265,7 +265,7 @@ function main() {
     fi
 
     [[ "$shuffle" -eq 1 && "$loop" -eq 0 ]] && LOG warn "Shuffle can only be used with mutiple tracks"
-    [[ "$shuffle" -eq 1 ]] && mapfile -t SELECTED <(printf "%s\n" "${SELECTED[@]}" | shuf)
+    [[ "$shuffle" -eq 1 ]] && mapfile -t SELECTED <(shuf <<< "${SELECTED[@]}")
 
     MPV_FLAGS+=(
         "--vid=${video:-"no"}"
@@ -289,8 +289,8 @@ function main() {
     fi
 
     MPV_FLAGS+=(
-        "--hwdec=vulkan"
-        "--gpu-api=vulkan"
+        # "--hwdec=vulkan"
+        # "--gpu-api=vulkan"
         "--hdr-compute-peak"
         "--loop-playlist=inf"
         "--msg-level=all=error"

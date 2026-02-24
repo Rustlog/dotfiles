@@ -1,58 +1,21 @@
 # If not running interactively, don't do anything
 [[ $- != *i* ]] && return
 
-#!/bin/bash
+source "$HOME/.cargo/env" 2> /dev/null
 
-# [[ Debian ]]
-# || User@Host ~ $ ||
-# PS1="\[\033[1m\]\[\033[38;2;80;24;230m\]||\[\033[0m\] \[\033[1m\]\[\033[3m\]\[\033[1;32m\]\$(whoami)\[\e[0m\]@\[\033[1m\]\[\033[3m\]\[\033[38;2;140;10;160m\]\$(hostname)\[\033[0m\]\[\e[m\] \[\e[0;36m\]\w\[\e[m\] $ \[\033[1m\]\[\033[38;2;80;24;230m\]||\[\033[0m\] "
-# echo
+source "${HOME}/.shell_rc" && main
 
-# [[ User@Host ~ $ ]]
-# PROMPT="%B%F{cyan}[[%b %B%F{#04ff5f}%n%b%F{white}%F{grey}%B@%b%B%F{#4A8DAF}%m%b %B%F{cyan}%~%b%F{white} $ %B%F{cyan}]]%b%f "
-
-
-# [[ Arch ]]
-
-# || User@Host ~ $ ||
-# PS1="\[\033[1m\]\[\033[38;2;80;24;230m\]||\[\033[0m\]\[\033[1m\]\[\033[3m\]\[\033[1;32m\]\$(whoami)\[\e[0m\]@\[\033[1m\]\[\033[3m\]\[\033[38;2;140;10;160m\]\$(hostname)\[\033[0m\]\[\e[m\] \[\e[0;36m\]\w\[\e[m\] $ \[\033[1m\033[38;2;80;24;230m\]||\[\033[0m\] "
-
-
-[[ $- != *i* ]] && return
-
-light_green="\[\033[38;2;163;240;96m\]"
-host_color="\[\033[38;2;231;245;180m\]"
-dir_color="\[\033[38;2;89;159;240m\]"
-branch_col="\[\033[38;2;129;137;223m\]"
-hl="\[\033[1m\]"
-nc="\[\033[0m\]"
-
-opening_bracket="${light_green}[[${nc}"
-closing_bracket="${light_green}]]${nc}"
-username="${light_green}\u${nc}"
-hostname="${host_color}\h${nc}"
-workingdirectory="${dir_color}\w${nc}"
-
-
-function show_current_git_branch() {
-    local blue="\[\033[38;2;0;200;200m\]"
-    local branch="$(git symbolic-ref --short HEAD 2> /dev/null)"
-    if [[ -n "${branch}" ]]; then
-        echo "${blue}(${nc}${branch_col}\[${branch}\]${nc}${blue})${nc} "
-    else
-        echo ""
-    fi
+function CD() {
+    local dir="${1:-}"
+    [[ -d "${dir}" ]] || { printf '[info]: %s\n' "Directory doesn't exist '${dir}'"; return 1; }
+    cd "${dir}" || printf '%b\n' "failed to chdir ${dir}"
 }
 
-# Custom Bash prompt by me — for color-coded, Git-aware shell
-
-PROMPT_COMMAND='PS1="${opening_bracket} ${username}@${hostname}:${workingdirectory} ${closing_bracket} $ $(show_current_git_branch)"'
-
-source "$HOME/.cargo/env" 2> /dev/null
-if source ${HOME}/.shell_rc 2> /dev/null; then
-    SetPath
-    SSH_Agent
-fi
+alias dotfiles="CD ~/dev/projects/repos/dotfiles"
+alias server="CD /srv/www/nginx"
+alias CPP="CD ~/other/Garage/C_PlusPlus/incompleted_souls.dir"
+alias C="CD ~/other/Garage/C_Lang"
+alias weather="curl wttr.in/24.5800,80.8369"
 
 [[ "$(tty)" == "/dev/tty"* ]] && setfont ter-732b
 
@@ -60,4 +23,6 @@ if [[ "$(tty)" == "/dev/tty"* ]]; then
     tput clear
     printf '\033]P01e1e2e\033]P1f38ba8\033]P2a6e3a1\033]P3f9e2af\033]P4fab387\033]P5f5c2e7\033]P6cba6f7\033]P7cdd6f4\033]P845475a\033]P9f38ba8\033]PAa6e3a1\033]PBf9e2af\033]PCfab387\033]PDf5c2e7\033]PEcba6f7\033]PFffffff'
 fi
+
+unset HISTFILE
 

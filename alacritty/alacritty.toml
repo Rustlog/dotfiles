@@ -54,7 +54,7 @@
     semantic_escape_chars = ",│`|:\"' ()[]{}<>"
 
 [terminal.shell]
-    args    = ["-l", "-c", "tmux attach-session &> /dev/null || tmux new-session -s Dev &> /dev/null"]
+    args    = ["-l", "-c", "tmux attach-session &> /dev/null || tmux new-session -s dev &> /dev/null"]
     program = "/bin/zsh"
 
 [window.dimensions]
