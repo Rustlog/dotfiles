@@ -360,7 +360,7 @@ function DefaultTemplate() {
     printf '%s\n' "$-" | grep -q "x" && is_debug_enabled=1
     { is_flag_enabled "${is_debug_enabled}" && set +x; } || true
     cat << EOF
-# $(date +"Date: %F, Created on: %T (%I:%M:%S_%p)")
+# $(date +"Date: %F, Created on: %T (%I:%M:%S %p)")
 
 ## @@ dump @@
 (just raw thoughts)
