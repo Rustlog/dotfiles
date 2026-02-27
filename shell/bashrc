@@ -6,16 +6,15 @@ source "$HOME/.cargo/env" 2> /dev/null
 source "${HOME}/.shell_rc" && main
 
 function CD() {
-    local dir="${1:-}"
-    [[ -d "${dir}" ]] || { printf '[info]: %s\n' "Directory doesn't exist '${dir}'"; return 1; }
-    cd "${dir}" || printf '%b\n' "failed to chdir ${dir}"
+    [[ -d "${1:-}" ]] || \
+        { printf '[info]: %s\n' "Directory doesn't exist '${dir}'"; return 1; }
+    cd "${1:-}" || \
+        { printf '[error]: %s\n' "failed to chdir to '${dir}'"; return 1; }
 }
 
-alias dotfiles="CD ~/dev/projects/repos/dotfiles"
+alias dotfiles="CD /dt/dt/dev/projects/repos/dotfiles"
 alias server="CD /srv/www/nginx"
-alias CPP="CD ~/other/Garage/C_PlusPlus/incompleted_souls.dir"
-alias C="CD ~/other/Garage/C_Lang"
-alias weather="curl wttr.in/24.5800,80.8369"
+alias weather="curl -fSL wttr.in/24.5800,80.8369"
 
 [[ "$(tty)" == "/dev/tty"* ]] && setfont ter-732b
 

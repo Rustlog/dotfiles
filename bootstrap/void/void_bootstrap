@@ -705,8 +705,23 @@ function Install_term_filemanagers() {
         { log error "failed to install '${MSG}' packages"; exit 1; }
 }
 
+function Install_qtile_setup() {
+    MSG="install Qtile"
+    local -a XBPSPkgs=(
+        qtile qtile-wayland
+        python3-dbus-fast # for Mpris2 widget
+        swayidle xinit swww
+        wayland xorg-server-xwayland xorg-server
+        grim slurp wl-clipboard wf-recorder
+        fuzzel
+    )
+
+    XBPS_install "${MSG}" "${XBPSPkgs[@]}" || \
+        { log error "failed to install '${MSG}' packages"; exit 1; }
+}
+
 function Install_sway_setup() {
-    MSG="install sway"
+    MSG="install Sway"
     local -a XBPSPkgs=(
         sway swayidle swaylock xinit swww
         wayland xorg-server-xwayland xorg-server

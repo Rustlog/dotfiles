@@ -173,6 +173,8 @@ function Export_vars() {
     EDITOR="nvim"
     BREW="/home/linuxbrew/.linuxbrew"
     MEDIA="/run/media/$USER"
+    VJOURNAL_DIR="/dt/dt/dev/journals"
+    MUSIC_DIR="/dt/dt/media/music"
     XDG_DATA_HOME="$HOME/.local/share"
     HOME="${HOME:-$(printf ~)}"
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID:-$(id -u)}}"
@@ -183,7 +185,7 @@ function Export_vars() {
 
     export HOSTNAME LANG WINEPREFIX HISTSIZE HISTFILE \
         EDITOR BREW MEDIA XDG_DATA_HOME HOME XDG_RUNTIME_DIR \
-        PAGER LESS LESSCHARSET PATH TMPDIR
+        PAGER LESS LESSCHARSET PATH TMPDIR MUSIC_DIR VJOURNAL_DIR
 }
 
 function Alias_vars() {
@@ -194,23 +196,22 @@ function Alias_vars() {
     alias ls="lsd --color=always --git --icon=always --group-directories-first --classify"
     alias ll="lsd --long --color=always --git --icon=always --group-directories-first --classify --permission octal --total-size --sort=size"
     alias lsblk="lsblk --paths -o+SIZE --fs"
+    alias diff="diff --color=auto"
+    alias grep="grep --color=auto"
+    alias ip="ip --color=auto"
 
     # File operations alias
     alias mv="mv --verbose"
 
     # Navigation/cd aliases
-    _CD_DIRS="mkdir -p \${dir} && cd \${dir}; unset dir"
-    alias M="dir=\${HOME}/media/music && ${_CD_DIRS}"
-    alias P="dir=\${HOME}/media/pictures && ${_CD_DIRS}"
-    alias V="dir=\${HOME}/media/videos && ${_CD_DIRS}"
-    alias D="dir=\${HOME}/Downloads && ${_CD_DIRS}"
-    alias L="dir=\${HOME}/dev/learndir && ${_CD_DIRS}"
-    alias R="dir=\${HOME}/dev/projects/repos && ${_CD_DIRS}"
-    alias p="dir=\${HOME}/dev/projects && ${_CD_DIRS}"
-    alias d="dir=\${HOME}/dev && ${_CD_DIRS}"
+    alias M="CD /dt/dt/media/music"
+    alias P="CD /dt/dt/media/pictures"
+    alias V="CD /dt/dt/media/videos"
+    alias L="CD /dt/dt/dev/learndir"
+    alias R="CD /dt/dt/dev/projects/repos"
+    alias D="CD \${HOME}/Downloads"
     alias lfcd="cd \$(lf -last-dir-path=/dev/stdout)"
     alias media="/run/media/\${USER}"
-    unset _CD_DIRS
 
     # Git aliases
     alias gs="git status"
@@ -231,9 +232,6 @@ function Alias_vars() {
     alias watch="watch --no-title"
     alias systemmonitor="XDG_CURRENT_DESKTOP=KDE GTK_THEME=Adwaita:dark QT_QPA_PLATFORMTHEME=gtk plasma-systemmonitor"
 
-    # Network/IP aliases
-    alias ip="ip --color=auto"
-
     # Application/tool aliases
     alias ncdu="ncdu --color dark"
     alias qemu="qemu-system-x86_64"
@@ -250,6 +248,9 @@ function Alias_vars() {
     alias gdbgui="gdbgui --no-browser"
     alias "clang++"="clang++ -fdiagnostics-color=always"
     alias "clang"="clang -fdiagnostics-color=always"
+    alias safe_copy="rsync -aPh --fsync"
+    alias mirror_copy="rsync -aPh --fsync --delete"
+    alias remote_copy="rsync -aPz --compress-choice=zstd"
 
     # Metadata/file info aliases
     command -v exiftool &>/dev/null || alias exiftool="/usr/bin/vendor_perl/exiftool"
@@ -1464,6 +1465,14 @@ function man() {
     man_="$(command -v mandb-man 2> /dev/null || echo /usr/bin/man)"
 
     { "${man_}" "${args[@]}" | col -b | /usr/bin/bat --decorations=never --pager="less -RF" --color=always --language=markdown; } 2> /dev/null
+}
+
+### cd but with custom messages
+function CD() {
+    [[ -d "${1:-}" ]] || \
+        { printf '[info]: %s\n' "Directory doesn't exist '${dir}'"; return 1; }
+    cd "${1:-}" || \
+        { printf '[error]: %s\n' "failed to chdir to '${dir}'"; return 1; }
 }
 
 function Font() {

@@ -22,7 +22,7 @@ function FilePicker() {
     selected_ref=${1}
     local selected=""
     cd "${D_WIREGUARD_FILES_DIR}" || \
-        log error "failed to chdir to '${D_WIREGUARD_FILES_DIR}'"
+        { log error "failed to chdir to '${D_WIREGUARD_FILES_DIR}'"; return 1; }
     if ! selected="$(find . -mindepth 1 -maxdepth 1 -type f -print | fzf)"; then
         log error "failed to select config"
         return 1

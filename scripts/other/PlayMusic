@@ -20,7 +20,7 @@ declare -a SELECTED=() CURRENTLY_PLAYING=()
 QUIET=0
 DETACH=0
 
-MUSIC_DIR="${HOME}/media/music"
+MUSIC_DIR="${MUSIC_DIR:-${HOME}/media/music}"
 
 function LOG() {
     local type_="${1}"; shift

@@ -306,27 +306,27 @@ mouse_warping container
 
         # Seek backward
             bindsym --locked $MOD+Ctrl+Left  exec playerctl position \
-                $( printf '%s' $(playerctl position) | awk '{ print $1 - (5)  }' )
+                $( awk "BEGIN { print ($(playerctl position) - 5)  }" )
             bindsym --locked $MOD+Left       exec playerctl position \
-                $( printf '%s' $(playerctl position) | awk '{ print $1 - (10) }' )
+                $( awk "BEGIN { print ($(playerctl position) - 10) }" )
             bindsym --locked $MOD+Shift+Left exec playerctl position \
-                $( printf '%s' $(playerctl position) | awk '{ print $1 - (40) }' )
+                $( awk "BEGIN { print ($(playerctl position) - 40) }" )
 
         # Seek forward
             bindsym --locked $MOD+Ctrl+Right  exec playerctl position \
-                $( printf '%s' $(playerctl position) | awk '{ print $1 + (5)  }' )
+                $( awk "BEGIN { print ($(playerctl position) + 5)  }" )
             bindsym --locked $MOD+Right       exec playerctl position \
-                $( printf '%s' $(playerctl position) | awk '{ print $1 + (10) }' )
+                $( awk "BEGIN { print ($(playerctl position) + 10) }" )
             bindsym --locked $MOD+Shift+Right exec playerctl position \
-                $( printf '%s' $(playerctl position) | awk '{ print $1 + (40) }' )
+                $( awk "BEGIN { print ($(playerctl position) + 40) }" )
 
         # Volume controls
             # Volume up
             bindsym --locked $MOD+Ctrl+Up   exec playerctl volume \
-                $( printf '%s' $(playerctl volume) | awk '{ print $1 + 1/20 }' )
+                $( awk "BEGIN { print ($(playerctl volume) + 1/20) }" )
             # Volume down
             bindsym --locked $MOD+Ctrl+Down exec playerctl volume \
-                $( printf '%s' $(playerctl volume) | awk '{ print $1 - 1/20 }' )
+                $( awk 'BEGIN { print $(playerctl volume) - 1/20 }' )
 
         # Play previous
             bindsym --locked $MOD+Shift+Down exec playerctl previous
@@ -472,7 +472,7 @@ mouse_warping container
         #$ Screen Recording $#
             # Start recording fullscreen! (Mod+Alt+V)
                 bindsym $MOD+Alt+V exec bash -c ' \
-                    DIR="${HOME}/media/videos/wf-recorder"; \
+                    DIR="${HOME}/dt/dt/media/videos/wf-recorder"; \
                     if [[ ! -d "${DIR}" ]]; then \
                         mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null; \
                     else \
@@ -492,7 +492,7 @@ mouse_warping container
 
             # Start recording on selected ratio of the screen (Mod+Shift+V)
                 bindsym $MOD+Shift+V exec bash -c ' \
-                    DIR="${HOME}/media/videos/wf-recorder"; \
+                    DIR="${HOME}/dt/dt/media/videos/wf-recorder"; \
                     if [[ ! -d "${DIR}" ]]; then \
                         mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null; \
                     else \
@@ -520,14 +520,14 @@ mouse_warping container
         #$ Screenshot $#
             # Take screenshot of fullscreen! (Mod+PrtSc)
                 bindsym $MOD+Print exec sh -c ' \
-                    DIR="${HOME}/media/pictures/grim"; \
+                    DIR="${HOME}/dt/dt/media/pictures/grim"; \
                     [ -d "${DIR}" ] || mkdir -p "${DIR}"; \
                     OUTPUT="${DIR}/$(date +"%F_%T:$(printf "%d\n" "$(date +%N)" | cut -b1-2)").png"; \
                     grim -t png -l 0 "${OUTPUT}" \
                 '
             # Screenshot of selected area (Mod+Shift+S)
                 bindsym $MOD+Shift+S exec sh -c ' \
-                    DIR="${HOME}/media/pictures/grim"; \
+                    DIR="${HOME}/dt/dt/media/pictures/grim"; \
                     [ -d "${DIR}" ] || mkdir -p "${DIR}"; \
                     OUTPUT="${DIR}/$(date +"%F_%T:$(printf "%d\n" "$(date +%N)" | cut -b1-2)").png"; \
                     grim -g "$(slurp -b aaccbb11)" -t png -l 0 "${OUTPUT}" \
@@ -669,7 +669,7 @@ mouse_warping container
 
         # Journal time
             bindsym $MOD+grave+J exec foot --app-id=journal \
-            vjournal --loglevel=1 edit-log today -t default
+            env VJOURNAL_DIR="/dt/dt/dev/journals" vjournal --loglevel=1 edit-log today -t default
 
 
 ### Additional configuration
