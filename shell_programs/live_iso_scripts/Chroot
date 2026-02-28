@@ -76,7 +76,7 @@ function main() {
 
     printf '\n' && log info "Chroot environment set up at '${chroot_target_dir}'"
 
-    chroot_hostname="$(cat "${chroot_target_dir}/etc/hostname" 2>/dev/null)"
+    chroot_hostname="$(cat "${chroot_target_dir}/etc/hostname" 2>/dev/null || true)"
     [[ -n "${chroot_hostname}" ]] || chroot_hostname="\h"
 
     sudo chroot "${chroot_target_dir}" su root -c " \

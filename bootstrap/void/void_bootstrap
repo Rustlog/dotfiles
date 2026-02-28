@@ -877,6 +877,7 @@ function Install_utils() {
         chafa numactl fbterm frp cryptsetup jless
         filelight 7zip
         keypunch fd
+        trippy
         vmpk # virtual piano
         spek-x sonic-visualiser # audio visualizers
         cutter # a advanced debugger/disassembler
