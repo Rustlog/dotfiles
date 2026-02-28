@@ -129,10 +129,19 @@ function ApplyShellTheme() {
     __HOSTNAME="${__FAINTED_YELLOW}${__hostname}${__NC}"
     __WORK_DIR="${__BLUE_DIR}${__work_dir}${__NC}"
 
+    is_inside_git() {
+        dir="${PWD:-}"
+        while [[ "${dir}" != "" ]]; do
+            [[ -d "${dir}/.git/" ]] && return 0
+            dir="${dir%/*}"
+        done
+        return 1
+    }
+
     # shellcheck disable=SC2329
     show_current_git_branch() {
         local __branch="" __string=""
-        if [[ -d ./.git/ ]] && git status --short &>/dev/null; then
+        if is_inside_git && git status --short &>/dev/null; then
             local __git_dirty=""
             [[ -n "$(git status --porcelain)" ]] && __git_dirty="*"
             if __branch=$(git rev-parse --git-path rebase-merge &>/dev/null && \
@@ -843,9 +852,9 @@ function SetLocale() {
 # Generate locale
 function LocaleGen() {
     local locale_name="${1}"
-    local lang="" enc=""
-    IFS=$'.' read -r lang enc <<< "${locale_name}"
-    sudo localedef -i "${lang}" -f "${enc}"
+    local lang="" enc="" IFS=""
+    IFS=$'.' read -r src_def_input charmap <<< "${locale_name}"
+    sudo localedef -v -i "${src_def_input}" -f "${charmap}" "${locale_name}"
     SetLocale "${locale_name}"
 }
 

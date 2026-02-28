@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+function log() {
+    printf '[%s]: %s\n' "${1}" "${2}"
+}
+
+function get_label() {
+    local partition="${1}"
+    local label_name=""
+    label_name="$(lsblk -o LABEL "${partition}" | grep -v LABEL)"
+    [[ -n "${label_name}" ]] || label_name="${label_name:$((${#label_name} - 4)):${#label_name}}"
+    printf '%s\n' "${label_name}"
+}
+
+function check_mount() {
+    local dir="${1}"
+    if mountpoint -q "${dir}"; then
+        log error "'${dir}' is already mounted, consider unmounting"
+        return 1
+    fi
+}
+
+function mount_fs() {
+    local -a cmd_args=("${@}")
+    # Extract the last element as target
+    local target="${cmd_args[$(( ${#cmd_args[@]} - 1 ))]}"
+    # Pop the last element from cmd_args array
+    cmd_args=("${cmd_args[@]:0:$(( ${#cmd_args[@]} - 1 ))}")
+
+    [[ -n "${target}" ]] || { log error "target is not set"; return 1; }
+
+    [[ ${#cmd_args[@]} -gt 0 ]] || { log error "mount command needs more arguments" ; return 1; }
+
+    if sudo mount --mkdir "${cmd_args[@]}" "${target}"; then
+        log info "mounted '${target}'"
+    else
+        log error "failed to mount '${target}'"
+        return 1
+    fi
+}
+
+function main() {
+    local partition="" chroot_target_dir="" user_id=""
+    local -i shift_val=2
+
+    partition="${1:-}"
+    [[ -n "${partition}" ]] || { log error "No partition given"; return 1; }
+    chroot_target_dir="${1:-}"
+    [[ -n "${chroot_target_dir}" ]] || { chroot_target_dir="/mnt/$(get_label "${partition}")" shift_val=$((shift_val - 1)); }
+
+    user_id="$(id -u)"
+
+    sudo mkdir -p "${chroot_target_dir}"
+    [[ "${chroot_target_dir:$((${#chroot_target_dir}-1)):1}" == / ]] && \
+        chroot_target_dir="${chroot_target_dir:0:$((${#chroot_target_dir}-1))}"
+
+    # shellcheck disable=SC2064
+    # trap "sudo umount -R \"${chroot_target_dir}\"; exit 0" EXIT SIGINT SIGTERM
+
+    # mount_fs "${partition}" "${chroot_target_dir}/" || return 1
+    mount_fs -t proc proc "${chroot_target_dir}/proc" || return 1
+    mount_fs -t sysfs sys "${chroot_target_dir}/sys" || return 1
+    mount_fs -t devtmpfs udev "${chroot_target_dir}/dev" || return 1
+    mount_fs -t devpts pts "${chroot_target_dir}/dev/pts" || return 1
+    mount_fs -t tmpfs shm "${chroot_target_dir}/dev/shm" || return 1
+    mount_fs -t tmpfs tmp "${chroot_target_dir}/tmp" || return 1
+    mount_fs --bind --make-private /run "${chroot_target_dir}/run" || return 1
+    mount_fs --bind --make-private "/run/user/${user_id}" "${chroot_target_dir}/run/user/${user_id}" || return 1
+
+    [[ -d "/dev/dri" ]] && \
+        { mount_fs --bind --make-private /dev/dri "${chroot_target_dir}/dev/dri" || return 1; }
+    [[ -d "/sys/firmware/efi/efivars" ]] && \
+        { mount_fs --bind --make-private /sys/firmware/efi/efivars "${chroot_target_dir}/sys/firmware/efi/efivars" || return 1; }
+
+    printf '\n' && log info "Chroot environment set up at '${chroot_target_dir}'"
+
+    chroot_hostname="$(cat "${chroot_target_dir}/etc/hostname" 2>/dev/null)"
+    [[ -n "${chroot_hostname}" ]] || chroot_hostname="\h"
+
+    sudo chroot "${chroot_target_dir}" su root -c " \
+        PS1='(chroot) \u@${chroot_hostname} :\w $ '; \
+        HISTCONTROL='ignoredups:erasedups'; \
+        export PS1 HISTCONTROL HISTFILE; \
+        unset HISTFILE; \
+        set -o vi; \
+        printf '\n'; printf '%s\\n' \"Welcome to ${chroot_hostname}!\"; \
+        exec bash \
+    "
+}
+
+main "${@}"
+
