@@ -4,8 +4,7 @@ set -euo pipefail
 
 VERBOSE=0
 
-PATH="/usr/local/bin:/usr/bin:/bin"
-export PATH
+PATH="${PATH:-/usr/local/bin:/usr/bin:/bin}"
 
 function log() {
     local _type="${1:-}"; shift
@@ -31,7 +30,7 @@ run_cmd() {
     local yt_dlp_path=""
     if ! yt_dlp_path="$(which yt-dlp 2>/dev/null)"; then
         if ! [[ -f ~/.local/bin/yt-dlp ]] && yt_dlp_path="$HOME/.local/bin/yt-dlp"; then
-            log error "yt-dlp program not found"
+            log error "yt-dlp program not found"; return 1
         fi
     fi
     [[ "$VERBOSE" -eq 1 ]] && log cmd_info "${yt_dlp_path} ${cmd_args[*]@Q}"
@@ -85,6 +84,7 @@ function main() {
             -q|--quality) consume_val video_f "${value}" i "${arg}"                 ;;
             -o|--output) consume_val output_format "${value}" i "${arg}"            ;;
             -f|--format) consume_val out_ext "${value}" i "${arg}"                  ;;
+            --[0-9]*) i=$((i-1)); consume_val video_f "[height<=${arg##*-}]" i      ;;
             *)
                 url="${arg}"
         esac

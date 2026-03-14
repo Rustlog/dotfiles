@@ -24,6 +24,8 @@ set cursorline
 filetype plugin indent on
 " Set background dark
 set background=dark
+" prevent inode change
+set backupcopy=yes
 
 " Enable swap files (saves the cursor position and other information)
 set swapfile

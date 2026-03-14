@@ -52,6 +52,6 @@ INFO "DE/WM" "${XDG_CURRENT_DESKTOP:-$DESKTOP_SESSION}"
 INFO "Display Resolution" "$(xrandr | grep '*' | awk '{print $1}' | head -n1)"
 
 HEADER "Network"
-INFO "IP Address" "$(hostname)"
-INFO "Default Interface" "$(ip route | awk '/default/ {print $5}' | head -n1)"
+INFO "IP Address" "$(ip route show | grep -o "src [0-9].*[0-9]" | sort -u | cut -d' ' -f2)"
+INFO "Default Interface" "$(ip route show | awk '/default/ {print $5}' | head -n1)"
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -x
+
 builtin set -euo pipefail
 
 function set_background() {
@@ -7,8 +9,8 @@ function set_background() {
 }
 
 function turn_off_display() {
-    sleep 0.04
-    swaymsg output '*' power off
+    # sleep 0.04 && swaymsg output '*' power off
+    :
 }
 
 function main() {

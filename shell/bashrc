@@ -3,7 +3,11 @@
 
 source "$HOME/.cargo/env" 2> /dev/null
 
-source "${HOME}/.shell_rc" && main
+if source "${HOME}/.shell_rc"; then
+    main; ApplyShellTheme simple
+fi
+
+[[ -r ~/ly-session.log ]] && rm ~/ly-session.log
 
 function CD() {
     [[ -d "${1:-}" ]] || \
@@ -12,15 +16,14 @@ function CD() {
         { printf '[error]: %s\n' "failed to chdir to '${dir}'"; return 1; }
 }
 
-alias dotfiles="CD /dt/dt/dev/projects/repos/dotfiles"
+alias dotfiles="CD \${HOME}/dev/projects/repos/dotfiles"
 alias server="CD /srv/www/nginx"
 alias weather="curl -fSL wttr.in/24.5800,80.8369"
-
-[[ "$(tty)" == "/dev/tty"* ]] && setfont ter-732b
 
 if [[ "$(tty)" == "/dev/tty"* ]]; then
     tput clear
     printf '\033]P01e1e2e\033]P1f38ba8\033]P2a6e3a1\033]P3f9e2af\033]P4fab387\033]P5f5c2e7\033]P6cba6f7\033]P7cdd6f4\033]P845475a\033]P9f38ba8\033]PAa6e3a1\033]PBf9e2af\033]PCfab387\033]PDf5c2e7\033]PEcba6f7\033]PFffffff'
+    setfont ter-732b 2>/dev/null || setfont /usr/share/kbd/consolefonts/ter-732b*
 fi
 
 unset HISTFILE

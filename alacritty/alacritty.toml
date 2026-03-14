@@ -55,7 +55,7 @@
 
 [terminal.shell]
     args    = ["-l", "-c", "tmux attach-session &> /dev/null || tmux new-session -s dev &> /dev/null"]
-    program = "/bin/zsh"
+    program = "zsh"
 
 [window.dimensions]
     columns = 120

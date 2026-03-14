@@ -52,7 +52,8 @@
     /* otf-font-awesome required for icons */
     border: none;
     border-radius: 4px;
-    font-family: "SourceCodePro Bold", "SourceSansPro Semibold", "DejaVu Sans";
+    /* font-family: "SourceCodePro Bold", "SourceSansPro Semibold", "DejaVu Sans"; */
+    font-family: "SourceCodePro Black", "LiberationMono BoldItalic", "SourceCodePro Bold", "SourceSansPro Bold", "HackNerdFont", "DejaVuSerif BoldItalic", "DejaVuSans Bold";
     font-size: 14px;
     color: inherit;
     box-shadow: inset 0px 0px 2px 2px transparent; /* Clean base shadow */
@@ -211,9 +212,9 @@ menuitem:disabled {
 
 @keyframes cava_Blink {
     0%   { color: @cava_purple ; opacity: 1; }
-    40%  { color: #FFB4B4 ; opacity: 0.6; }
-    50%  { color: #AFA9FF ; opacity: 0.6; }
-    60%  { color: #FFE4A4 ; opacity: 0.6; }
+    /* 40%  { color: #FFB4B4 ; opacity: 0.6; } */
+    /* 50%  { color: #AFA9FF ; opacity: 0.6; } */
+    /* 60%  { color: #FFE4A4 ; opacity: 0.6; } */
     100% { color: @cava_purple ; opacity: 1; }
 }
 

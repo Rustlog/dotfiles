@@ -33,13 +33,13 @@ bar {
     xwayland enabled
 
 ### move cursor to focused container
-mouse_warping container
+# mouse_warping container
 
 ### Input devices ###
 
-    #* Hide cursor in 1 secs
+    #* Hide cursor in 3 secs
     seat * {
-        hide_cursor 1000
+        hide_cursor 3000
         xcursor_theme breeze_cursors 24
         hide_cursor when-typing enable
         pointer_constraint enable
@@ -155,15 +155,15 @@ mouse_warping container
     '
 
     exec swayidle -w \
-            timeout 100 "${HOME}/.config/sway/lock_screen/lock.sh" \
-            resume "swaymsg 'output * power on'" \
-            before-sleep "${HOME}/.config/sway/lock_screen/lock.sh set_bg"
+        timeout 100 "${HOME}/.config/sway/lock_screen/lock.sh" \
+        resume "swaymsg 'output * power on'" \
+        before-sleep "${HOME}/.config/sway/lock_screen/lock.sh set_bg"
 
     # Start foot server
     exec_always sh -c ' \
-        sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/foot-${WAYLAND_DISPLAY:-wayland-1}.sock"; \
-        { [ -S "${sock}" ] && exit 0; } || true; \
-        foot --config ~/.config/sway/Config/footconfig --server="${sock}" & \
+        foot_sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/foot-${WAYLAND_DISPLAY:-wayland-1}.sock"; \
+        { [ -S "${foot_sock}" ] && exit 0; } || true; \
+        foot --config ~/.config/sway/Config/footconfig --server="${foot_sock}" & \
     '
 
 ### Window rules ###
@@ -185,13 +185,13 @@ mouse_warping container
         for_window [app_id="^(Floating|Float|solid_f|floating|float)$"] floating enable, move position center
     # Enable floating (don't tile when launched)
         for_window [app_id="^(com.rtosta.zapzap|org.pulseaudio.pavucontrol)$"] floating enable
-        for_window [app_id="^(nm-connection-editor)$"] floating enable
-        for_window [app_id="^(pavucontrol|com.github.wwmm.easyeffects)$|waterfox*|vivaldi*"] floating enable
-        for_window [app_id="^(org.kde.dolphin|org.kde.plasma-systemmonitor)$"] floating enable
-        for_window [app_id="^(blueman-manager|org.kde.konsole|org.kde.elisa)$"] floating enable
-        for_window [app_id="^(org.kde.okular|org.qutebrowser.qutebrowser|org.kde.kclock$)$"] floating enable
-        for_window [class="^(Brave-browser|ZapZap|discord|qutebrowser)$"] floating enable
-        for_window [app_id="^blender*|org.gnome.Nautilus"] floating enable
+        for_window [app_id="^(nm-connection-editor|.*smile)$"] floating enable
+        for_window [app_id="^(pavucontrol|.*easyeffects)$|waterfox*|vivaldi*"] floating enable
+        for_window [app_id="^(org.kde.dolphin|.*systemmonitor)$"] floating enable
+        for_window [app_id="^(blueman-manager|.*konsole|.*elisa)$"] floating enable
+        for_window [app_id="^(.*okular|.*qutebrowser|.*kclock$)$"] floating enable
+        for_window [class="^(Brave.*|ZapZap|discord|qutebrowser)$"] floating enable
+        for_window [app_id="^blender*|.*Nautilus"] floating enable
 
     # <outer-border-color> <frame-color> <title-text-color> <next-tiling-indicator-color>
         client.focused   #333333 #6600AA #DDDDDD #6600AA
@@ -450,8 +450,8 @@ mouse_warping container
             bindsym $MOD+F5 exec find ~/.bin/ -name Browser -exec {} 5 ";"
 
         # Bring my Text-fu terminal
-            bindsym $MOD+Return exec footclient
-            bindsym Alt+Return exec foot --app-id=solid
+            bindsym $MOD+Return exec foot --app-id=solid
+            bindsym Alt+Return exec footclient
             bindsym $MOD+Shift+Return exec alacritty
 
         # File Managers
@@ -459,7 +459,7 @@ mouse_warping container
                 env XDG_CURRENT_DESKTOP=kde QT_QPA_PLATFORMTHEME=qt6ct dolphin
             bindsym $MOD+E exec nautilus
         # Lauch application launcher
-            bindsym Alt+Space exec $fuzzel
+            bindsym Alt+Space exec env PATH="${PATH}:/bin:/sbin:/usr/bin:/usr/local/bin" $fuzzel
             bindsym Alt+Shift+Space exec $menu_rofi
         # Lauch fuzzel
             bindsym $MOD+D exec $menu_wofi
@@ -472,7 +472,7 @@ mouse_warping container
         #$ Screen Recording $#
             # Start recording fullscreen! (Mod+Alt+V)
                 bindsym $MOD+Alt+V exec bash -c ' \
-                    DIR="${HOME}/dt/dt/media/videos/wf-recorder"; \
+                    DIR="${HOME}/media/videos/wf-recorder"; \
                     if [[ ! -d "${DIR}" ]]; then \
                         mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null; \
                     else \
@@ -492,19 +492,16 @@ mouse_warping container
 
             # Start recording on selected ratio of the screen (Mod+Shift+V)
                 bindsym $MOD+Shift+V exec bash -c ' \
-                    DIR="${HOME}/dt/dt/media/videos/wf-recorder"; \
-                    if [[ ! -d "${DIR}" ]]; then \
-                        mkdir -p "${DIR}"; pidof wf-recorder &> /dev/null; \
-                    else \
-                        declare -a flags; \
-                        flags=( \
-                            "--pixel-format=yuv420p" \
-                            "--framerate=60" \
-                            "--audio=$(pactl get-default-sink).monitor" \
-                            "--geometry=$(slurp -b aaccbb11)" \
-                            "--file=${DIR}/$(date +rec_%F_%T.mkv)" \
-                        ); \
-                    fi; \
+                    DIR="${HOME}/media/videos/wf-recorder"; \
+                    mkdir -p "${DIR}"; \
+                    declare -a flags; \
+                    flags=( \
+                        "--pixel-format=yuv420p" \
+                        "--framerate=60" \
+                        "--audio=$(pactl get-default-sink).monitor" \
+                        "--geometry=$(slurp -b aaccbb11)" \
+                        "--file=${DIR}/$(date +rec_%F_%T.mkv)" \
+                    ); \
                     notify-send -t 1000 "Screen recording started (${flags[3]##*=})"; \
                     if ! wf-recorder "${flags[@]}" --codec=h264_nvenc -p preset=fast; then \
                         wf-recorder "${flags[@]}" --codec=libx264 -p preset=ultrafast; \
@@ -520,14 +517,14 @@ mouse_warping container
         #$ Screenshot $#
             # Take screenshot of fullscreen! (Mod+PrtSc)
                 bindsym $MOD+Print exec sh -c ' \
-                    DIR="${HOME}/dt/dt/media/pictures/grim"; \
+                    DIR="${HOME}/media/pictures/grim"; \
                     [ -d "${DIR}" ] || mkdir -p "${DIR}"; \
                     OUTPUT="${DIR}/$(date +"%F_%T:$(printf "%d\n" "$(date +%N)" | cut -b1-2)").png"; \
                     grim -t png -l 0 "${OUTPUT}" \
                 '
             # Screenshot of selected area (Mod+Shift+S)
                 bindsym $MOD+Shift+S exec sh -c ' \
-                    DIR="${HOME}/dt/dt/media/pictures/grim"; \
+                    DIR="${HOME}/media/pictures/grim"; \
                     [ -d "${DIR}" ] || mkdir -p "${DIR}"; \
                     OUTPUT="${DIR}/$(date +"%F_%T:$(printf "%d\n" "$(date +%N)" | cut -b1-2)").png"; \
                     grim -g "$(slurp -b aaccbb11)" -t png -l 0 "${OUTPUT}" \

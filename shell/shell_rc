@@ -35,7 +35,8 @@ function Bash_and_ZSH_setup() {
         set -o vi
         export HISTCONTROL="ignoredups:erasedups"
         bind '"\C-o":"lfcd\n"'
-        bind "\"\C-L\":\"printf '%b' '\\\\e[1J\\\\e[1H'\n\""
+        bind -m vi-insert '"\C-l": clear-screen'
+        bind -m vi-command '"\C-l": clear-screen'
     elif [[ -n "$ZSH_VERSION" ]]; then
         export ZSH="${HOME}/.oh-my-zsh"
         CASE_SENSITIVE=true
@@ -43,7 +44,9 @@ function Bash_and_ZSH_setup() {
         plugins+=(vi-mode git gitfast docker pass)
         # shellcheck disable=SC1091
         source "${ZSH}/oh-my-zsh.sh"
-        zsh_dir="$(find /usr/share/zsh* -type d -name 'zsh-syntax-highlighting')"
+        zsh_dir="$( \
+            find /usr/share/zsh* \( -type d -o -type l \) -name 'zsh-syntax-highlighting' 2>/dev/null
+        )"
         # shellcheck disable=SC1090
         source "${zsh_dir}"/*.zsh
         bindkey -s '^o' 'lfcd\n'
@@ -61,6 +64,7 @@ function Bash_and_ZSH_setup() {
 }
 
 function ApplyShellTheme() {
+    local arg="${1:-default}"
     local __ESC=$'\e' __bracket_color=""
     local __guessed_hardware=""
 
@@ -103,7 +107,7 @@ function ApplyShellTheme() {
                     fi
                 fi
             fi
-            __guessed_hardware="$(grep CHASSIS_TYPE /etc/machine-info | cut -d= -f2 2>/dev/null)" 
+            __guessed_hardware="$(grep CHASSIS_TYPE /etc/machine-info | cut -d= -f2 2>/dev/null)"
         fi
     fi
 
@@ -162,12 +166,14 @@ function ApplyShellTheme() {
     }
 
     if [[ -n "$BASH_VERSION" ]]; then
+        [[ "${arg}" =~ ^(simple|generic)$ ]] && { PROMPT_COMMAND='PS1="${__WORK_DIR} $(show_current_git_branch)$ "'; return 0; }
         PROMPT_COMMAND='PS1="${__OPEN} ${__GUESSED_HARDWARE}${__USERNAME}@${__HOSTNAME}:${__WORK_DIR} $(show_current_git_branch)${__CLOSE} $ "'
     elif [[ -n "$ZSH_VERSION" ]]; then
         autoload -Uz vcs_info
         zstyle ":vcs_info:git:*" formats "${__WHITE}git${__NC}:${__SKY_GREEN}(${__NC}${__VIOLET}%b${__NC}${__SKY_GREEN})${__NC} "
         zstyle ":vcs_info:git:*" actionformats ""
         precmd() { vcs_info; }
+        [[ "${arg}" =~ ^(simple|generic)$ ]] && { PROMPT='${__WORK_DIR} ${vcs_info_msg_0_}$ '; return 0; }
         PROMPT='${__OPEN} ${__GUESSED_HARDWARE}${__USERNAME}@${__HOSTNAME}:${__WORK_DIR} ${vcs_info_msg_0_}${__CLOSE} $ '
     fi
 }
@@ -188,7 +194,7 @@ function Export_vars() {
     HOME="${HOME:-$(printf ~)}"
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID:-$(id -u)}}"
     TMPDIR="${XDG_RUNTIME_DIR}/tmp/"
-    PAGER=less
+    PAGER="less -c"
     LESS="-R"
     LESSCHARSET=utf-8
 
@@ -204,7 +210,7 @@ function Alias_vars() {
     alias eza="eza --color=always --icons=always --group --header --classify=always --octal-permissions --binary --across --sort=size"
     alias ls="lsd --color=always --git --icon=always --group-directories-first --classify"
     alias ll="lsd --long --color=always --git --icon=always --group-directories-first --classify --permission octal --total-size --sort=size"
-    alias lsblk="lsblk --paths -o+SIZE --fs"
+    alias Lsblk="lsblk --paths -o+SIZE --fs"
     alias diff="diff --color=auto"
     alias grep="grep --color=auto"
     alias ip="ip --color=auto"
@@ -213,14 +219,14 @@ function Alias_vars() {
     alias mv="mv --verbose"
 
     # Navigation/cd aliases
-    alias M="CD /dt/dt/media/music"
-    alias P="CD /dt/dt/media/pictures"
-    alias V="CD /dt/dt/media/videos"
-    alias L="CD /dt/dt/dev/learndir"
-    alias R="CD /dt/dt/dev/projects/repos"
-    alias D="CD \${HOME}/Downloads"
+    alias M="CD \$HOME/media/music"
+    alias P="CD \$HOME/media/pictures"
+    alias V="CD \$HOME/media/videos"
+    alias L="CD \$HOME/dev/learndir"
+    alias R="CD \$HOME/dev/projects/repos"
+    alias D="CD \$HOME/Downloads"
+    alias d="CD \$HOME/dev"
     alias lfcd="cd \$(lf -last-dir-path=/dev/stdout)"
-    alias media="/run/media/\${USER}"
 
     # Git aliases
     alias gs="git status"
@@ -237,7 +243,7 @@ function Alias_vars() {
     # System monitoring aliases
     alias nvtop="nvtop --delay 2"
     alias radeontop="radeontop --color"
-    alias Dmesg="dmesg --color=always | less"
+    alias Dmesg="sudo dmesg --color=always | less -c -"
     alias watch="watch --no-title"
     alias systemmonitor="XDG_CURRENT_DESKTOP=KDE GTK_THEME=Adwaita:dark QT_QPA_PLATFORMTHEME=gtk plasma-systemmonitor"
 
@@ -252,8 +258,8 @@ function Alias_vars() {
     alias getcolors="env QT_QPA_PLATFORMTHEME=qt6ct kcolorchooser 2> /dev/null & disown"
     alias ffmpeg="ffmpeg -hide_banner"
     alias gcaf="git commit --amend --no-edit && git reflog expire --expire=now --all && git gc --prune=now"
-    alias mpv="mpv --volume=40 --vid=auto --audio-device=pulse"
-    alias mpv="mpv --volume=40 --vid=auto"
+    alias ttyper_H="ttyper --words 20 --language english-advanced"
+    alias mpv="env VK_ICD_FILENAMES=\$(printf /usr/share/vulkan/icd.d/*radeon*x86_64.json) mpv --volume=40 --vid=auto --audio-device=pulse"
     alias gdbgui="gdbgui --no-browser"
     alias "clang++"="clang++ -fdiagnostics-color=always"
     alias "clang"="clang -fdiagnostics-color=always"
@@ -264,10 +270,15 @@ function Alias_vars() {
     # Metadata/file info aliases
     command -v exiftool &>/dev/null || alias exiftool="/usr/bin/vendor_perl/exiftool"
     alias metadata="/usr/bin/vendor_perl/exiftool"
-    alias Fonts="fc-list : file | sed 's|.*/||' | sed 's/\.[^.]*$//' | sort -u"
+    alias Fonts="fc-list : file | \
+        sed \
+            -e 's|.*/||' \
+            -e 's|\[.*\]||' \
+            -e 's|-| |' -e 's|\..*||' | sort -u"
 
     # System/log management aliases
-    alias clear_systemd_journal_logs="sudo journalctl --rotate && sudo journalctl --vacuum-size=1K && sudo journalctl --vacuum-time=1s"
+    alias clear_systemd_journal_logs="sudo journalctl --rotate && \
+        sudo journalctl --vacuum-size=1K && sudo journalctl --vacuum-time=1s"
     alias sourceme="source ~/.zshrc"
     alias savehist="file=$HOME/.saved_shell_history && cat \$HISTFILE >> \${file} && unset file"
 
@@ -475,28 +486,6 @@ function Tor() {
     unset -f set_var unset_var
 }
 
-### Extract a tar archive
-function Extract() {
-    local archive="$1"
-    case ${archive} in
-        *.tar)
-            tar --extract --verbose --file="${archive}"
-            ;;
-        *.tar.gz)
-            tar --extract --gzip --verbose --file="${archive}"
-            ;;
-        *.tar.xz)
-            tar --extract --xz --verbose --file="${archive}"
-            ;;
-        *.tar.bzip2)
-            tar --extract --bzip2 --verbose --file="${archive}"
-            ;;
-        *)
-            log error "'${archive}' is not tar archieve"
-            ;;
-    esac
-}
-
 ### Mount a remote to local mount point
 function RcloneMount() {
     [[ -n $ZSH_VERSION ]] && emulate -LR bash
@@ -674,10 +663,12 @@ function GUI_BUILD_RELEASE() {
 
 ### Set the path with default locations
 function SetPath() {
-    PATH="/usr/bin:/usr/sbin:/bin:/sbin:/usr/local/bin:/usr/local/sbin"
-    PATH+=: PATH+="$(find ~/.bin/* -type d | paste -sd:)"
+    PATH="/run/wrappers/bin:$HOME/.nix-profile/bin:/nix/profile/bin:$HOME/.local/state/nix/profile/bin"
+    PATH+=: PATH+="/etc/profiles/per-user/$USER/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
+    PATH+=: PATH+="/usr/bin:/usr/sbin:/bin:/sbin:/usr/local/bin:/usr/local/sbin"
+    PATH+=: PATH+="$(find ~/.bin/* -type d 2>&1 | paste -sd: 2>/dev/null)"
     PATH+=: PATH+="${HOME}/.local/bin:${HOME}/.cargo/bin:${HOME}/.npm_global/bin:${BREW}/bin"
-    PATH+=: PATH+="${HOME}/.scripts"
+    PATH+=: PATH+="${HOME}/.scripts:${HOME}/.cargo/bin"
     export PATH
 }
 
@@ -762,7 +753,7 @@ function CatBat() {
                 ;;
         esac
     done
-    /usr/bin/bat \
+    bat \
         --theme-dark=TwoDark \
         --color=always \
         --decorations=never \
@@ -1467,13 +1458,14 @@ function Steam() {
 }
 
 ### Man but cool man
-function man() {
+function Man() {
     set -o pipefail
     local args=("$@")
-    local man_
-    man_="$(command -v mandb-man 2> /dev/null || echo /usr/bin/man)"
-
-    { "${man_}" "${args[@]}" | col -b | /usr/bin/bat --decorations=never --pager="less -RF" --color=always --language=markdown; } 2> /dev/null
+    man "${args[@]}" | col -b | \
+        bat --decorations=never \
+        --pager="less -RF" \
+        --color=always \
+        --language=markdown;
 }
 
 ### cd but with custom messages
@@ -1543,7 +1535,7 @@ function sway_vulkan() {
 
 function Cat() {
     local -a args=("${@}")
-    /usr/bin/bat --theme-dark=TwoDark \
+    bat --theme-dark=TwoDark \
         --color=always \
         --paging=never \
         --decorations=never "${args[@]}" | less -c -
@@ -1708,12 +1700,12 @@ function SSH_Agent() {
 }
 
 function main() {
-    ApplyShellTheme
+    # ApplyShellTheme
     Export_vars
+    SetPath
     Bash_and_ZSH_setup
     SetLocale
     Alias_vars
-    SetPath
     SSH_Agent
 }
 
