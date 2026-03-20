@@ -188,8 +188,8 @@ function Export_vars() {
     EDITOR="nvim"
     BREW="/home/linuxbrew/.linuxbrew"
     MEDIA="/run/media/$USER"
-    VJOURNAL_DIR="/dt/dt/dev/journals"
-    MUSIC_DIR="/dt/dt/media/music"
+    VJOURNAL_DIR="${HOME}/dev/journals"
+    MUSIC_DIR="${HOME}/media/music"
     XDG_DATA_HOME="$HOME/.local/share"
     HOME="${HOME:-$(printf ~)}"
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID:-$(id -u)}}"
@@ -1663,13 +1663,19 @@ function Pretty_rename() {
 function PrefixRename() {
     local prefix="${1:-}"
     [[ -n "${prefix}" ]] || { log error "no prefix pattern given"; return 1; }
-    for f in *; do
-        if [[ "${f}" == "${prefix}"* ]]; then
-            printf '%s\n' "Skipping '${f}'"
+    while IFS= read -r file; do
+        if [[ "${file}" == "${prefix}"* ]]; then
+            printf '%s\n' "Skipping '${file}'"
+        elif [[ -d "${file}" ]]; then
+            printf '%s\n' "Skipping directory '${file}'"
         else
-            mv -v "${f}" "${prefix}${f}"
+            [[ -f "${file}" ]] && mv -v "${file}" "${prefix}${file}"
         fi
-    done
+    done < <( \
+        find . -mindepth 1 -maxdepth 1 \
+            \( -type f -o \( -type l -a -xtype f \) \) \
+            -printf "%P\n" \
+    )
 }
 
 ### Get randomcolors quickly
