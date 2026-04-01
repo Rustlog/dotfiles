@@ -89,8 +89,9 @@
     },
 
     "custom/seperator": {
-        // "format": ""
+        "format": "",
         "format": "|",
+        "format": "*",
         "tooltip": false
     },
 
@@ -219,12 +220,12 @@
     },
 
     "battery": {
+        "interval": 6,
         "states": {
             "good": 96,
             "warning": 40,
             "critical": 24
         },
-        "interval": 1,
         "format": " {capacity}% {icon} ",
         "format-full": " {capacity}% {icon} ",
         "format-charging": " {capacity}%  ",
@@ -234,18 +235,15 @@
     },
 
     "network": {
-        // "format-wifi": "{ifname}: {ipaddr}/{cidr}  {bandwidthDownBits}  {bandwidthUpBits}",
         "interval": 1,
         "tooltip": true,
         "format": "󰤮  Wifi disabled",
         "format-wifi": "    {bandwidthDownBits}  {bandwidthUpBits}",
-        "format-alt": "  {essid} ({signalStrength}%)",
-        "tooltip-format": "{ifname} via {gwaddr} ",
-        "format-linked": "{ifname} (No IP) ",
-        "format-ethernet": "{ifname} 󰌘",
+        "format-alt": "   {ifname}",
+        "format-linked": "{ifname} ",
+        "format-ethernet": "{ifname} 󰌘 ( {bandwidthDownBits}  {bandwidthUpBits})",
         "format-disconnected": "󰌙 Disconnected",
-        "tooltip-format": "SSID: {essid}\nSpeed:  {bandwidthDownBits}  {bandwidthUpBits}\nIP: {ipaddr}\nGateway: {gwaddr}\nMAC: {bssid}\nStrength: {signalStrength}%\nSubnetMask: ipv4: {netmask}, ipv6: {netmask6}",
-        "tooltip-format-ethernet": "{ifname} 󰌘",
+        "tooltip-format": "ssid: {essid}\nspeed:  {bandwidthDownBits}  {bandwidthUpBits}\nip: {ipaddr}\nGateway: {gwaddr}\nmac: {bssid}\nstrength: {signalStrength}%\nnetmask(4): {netmask}\nnetmask(6): {netmask6}\nfrequency: {frequency}Ghz",
         "tooltip-format-disconnected": "󰌙 Disconnected",
         "on-click-right": "foot -a Floating -w 1261x597 bash -c 'nmcli -colors=yes dev wifi list --rescan yes; read -r -n 1 -s'",
         "on-double-middle": "notify-send -t 1000 'Double click'",

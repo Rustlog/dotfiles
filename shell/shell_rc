@@ -259,7 +259,7 @@ function Alias_vars() {
     alias ffmpeg="ffmpeg -hide_banner"
     alias gcaf="git commit --amend --no-edit && git reflog expire --expire=now --all && git gc --prune=now"
     alias ttyper_H="ttyper --words 20 --language english-advanced"
-    alias mpv="env VK_ICD_FILENAMES=\$(printf /usr/share/vulkan/icd.d/*radeon*x86_64.json) mpv --volume=40 --vid=auto --audio-device=pulse"
+    alias mpv="env VK_ICD_FILENAMES=\$(printf /usr/share/vulkan/icd.d/*radeon*x86_64.json) mpv --volume=44 --vid=auto --audio-device=pulse"
     alias gdbgui="gdbgui --no-browser"
     alias "clang++"="clang++ -fdiagnostics-color=always"
     alias "clang"="clang -fdiagnostics-color=always"
@@ -774,10 +774,11 @@ function Less() {
                 ;;
         esac
     done
-    /usr/bin/bat \
+    bat \
         --theme-dark=TwoDark \
         --color=always \
         --decorations=never \
+        --pager="less -c" \
         --paging=always "${batargs[@]}"
 }
 
@@ -1463,7 +1464,7 @@ function Man() {
     local args=("$@")
     man "${args[@]}" | col -b | \
         bat --decorations=never \
-        --pager="less -RF" \
+        --pager="less -c -RF" \
         --color=always \
         --language=markdown;
 }
@@ -1552,6 +1553,23 @@ function ASCIIfy() {
         fi
     done
 }
+
+function CurrencyConverter() {
+    local curr1="${1:-}" curr2="${2:-}"
+    local amount="${3:-}"
+
+    [[ -n "${curr1}" ]] ||  \
+        { log error "curr1 is unset"; return 1; }
+    [[ -n "${curr2}" ]] ||  \
+        { log error "curr2 is unset"; return 1; }
+    [[ -n "${amount}" ]] ||  \
+        { log error "amount is unset"; return 1; }
+
+    local exchange_url="https://api.frankfurter.app/latest?from=${curr1}&to=${curr2}"
+    local rate="$(curl -fsSL "${exchange_url}" | jq -r '.rates.[]')"
+    awk -v rate="${rate}" -v amount="${amount}" 'BEGIN { printf "%.2f\n", (rate*amount); } '
+}; alias usd_to_inr="CurrencyConverter USD INR"; alias inr_to_usd="CurrencyConverter INR USD"
+alias dollar_to_rupee="CurrencyConverter USD INR"; rupee_to_dollar="CurrencyConverter INR USD";
 
 function notify() {
     [[ -n $ZSH_VERSION ]] && emulate -LR bash

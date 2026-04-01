@@ -37,9 +37,9 @@ bar {
 
 ### Input devices ###
 
-    #* Hide cursor in 3 secs
+    #* Hide cursor in 2 secs
     seat * {
-        hide_cursor 3000
+        hide_cursor 2000
         xcursor_theme breeze_cursors 24
         hide_cursor when-typing enable
         pointer_constraint enable
@@ -132,6 +132,9 @@ bar {
     # XDG desktop fixes
     exec /usr/lib*/xdg-desktop-portal-wlr
     exec /usr/lib*/xdg-desktop-portal -r
+
+    # kdeconnect daemon
+    exec kdeconnectd
 
     # GTK Theme
     set $schema org.gnome.desktop.interface

@@ -291,8 +291,19 @@ autocmd BufWritePost *.sh,*.py if getline(1) =~ '^#!' | silent !chmod +x '%' | e
 
 " Set colorscheme based on filetype
 augroup ColorSchemeSelector
-    autocmd FileType     c,cpp                      colorscheme tokyonight-moon
-    autocmd FileType     iss                        colorscheme molokai
+    autocmd FileType     c,cpp  colorscheme tokyonight-moon |
+        \ highlight! ExtraWhitespace guibg=red ctermbg=red
+    autocmd FileType     iss    colorscheme molokai |
+        \ highlight! ExtraWhitespace guibg=red ctermbg=red
+augroup END
+
+" highlight trailing whitespace with red
+highlight! ExtraWhitespace guibg=red ctermbg=red
+augroup HighlightWhitespace
+    autocmd!
+    autocmd ColorScheme * highlight! ExtraWhitespace guibg=red ctermbg=red
+    autocmd BufWinEnter,BufReadPost * call clearmatches() |
+        \ call matchadd('ExtraWhitespace', '\s\+$')
 augroup END
 
 " C tmeplate
