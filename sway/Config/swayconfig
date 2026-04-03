@@ -188,8 +188,8 @@ bar {
         for_window [app_id="^(Floating|Float|solid_f|floating|float)$"] floating enable, move position center
     # Enable floating (don't tile when launched)
         for_window [app_id="^(com.rtosta.zapzap|org.pulseaudio.pavucontrol)$"] floating enable
-        for_window [app_id="^(nm-connection-editor|.*smile)$"] floating enable
-        for_window [app_id="^(pavucontrol|.*easyeffects)$|waterfox*|vivaldi*"] floating enable
+        for_window [app_id="^(nm-connection-editor|.*smile|.*obsproject.*)$"] floating enable
+        for_window [app_id="^(.*pavucontrol.*|.*easyeffects.*)$|waterfox*|vivaldi*"] floating enable
         for_window [app_id="^(org.kde.dolphin|.*systemmonitor)$"] floating enable
         for_window [app_id="^(blueman-manager|.*konsole|.*elisa)$"] floating enable
         for_window [app_id="^(.*okular|.*qutebrowser|.*kclock$)$"] floating enable

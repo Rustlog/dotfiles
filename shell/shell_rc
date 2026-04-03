@@ -180,6 +180,7 @@ function ApplyShellTheme() {
 
 function Export_vars() {
     ### Global variables
+    local schema_path
     HOSTNAME="${HOSTNAME:-$(cat /etc/hostname)}"
     LANG="en_US.UTF-8"
     WINEPREFIX="$HOME/wine"
@@ -197,6 +198,8 @@ function Export_vars() {
     PAGER="less -c"
     LESS="-R"
     LESSCHARSET=utf-8
+    schema_path="$(printf /nix/store/*gtk+3*/share/gsettings-schemas/* 2>&1 | cut -d' ' -f1 2>/dev/null)"
+    [[ -d "${schema_path}" ]] && XDG_DATA_DIRS="${XDG_DATA_DIRS}:${schema_path}"
 
     export HOSTNAME LANG WINEPREFIX HISTSIZE HISTFILE \
         EDITOR BREW MEDIA XDG_DATA_HOME HOME XDG_RUNTIME_DIR \
@@ -301,6 +304,10 @@ function Alias_vars() {
     unset _FP_RUN
 
     # Utility aliases
+    alias C='{ command -v clang &>/dev/null && COMPILER=clang; } || COMPILER=cc; \
+        $COMPILER -x c -std=c23 -O0 -pedantic -Wall -Wextra'
+    alias CC='{ command -v clang &>/dev/null && COMPILER=clang; } || COMPILER=cc; \
+        $COMPILER -x c++ -std=c++23 -lstdc++ -O0 -pedantic -Wall -Wextra'
     alias NULL="/dev/null"
     alias clear="tput clear"
     alias reset="tput reset"
@@ -1114,18 +1121,27 @@ function SetPower() {
     sudo ryzenadj --stapm-limit=$stapm --fast-limit=$fast --slow-limit=$slow --apu-slow-limit=$apuslow --tctl-temp=$core_temp 2> /dev/null
 }
 
-# show battery percentage
-function BatteryNow() {
-    awk '
-        FNR==NR { full += $1; next }
-        { now += $1 }
-        END {
-            if (full <= 0) {
-                print "invalid value", full; exit 1
+# show battery stats
+function BatteryStats() {
+    local bat_base="" bat_full="" bat_now="" bat_power_now="" \
+        bat_status=""
+
+    for bat in /sys/class/power_supply/BAT*/energy_full; do
+        bat_base="${bat%/*}" bat_base="${bat_base##*/}"
+        bat_full="$(</sys/class/power_supply/${bat_base}/energy_full)"
+        bat_now="$(</sys/class/power_supply/${bat_base}/energy_now)"
+        bat_status="$(</sys/class/power_supply/${bat_base}/status)"
+        bat_power_now="$(</sys/class/power_supply/${bat_base}/power_now)"
+
+        awk -v bat_name="${bat_base}" -v bat_now="${bat_now}" -v bat_full="${bat_full}" \
+            -v bat_power_now="${bat_power_now}" -v bat_status="${bat_status}" '
+            BEGIN {
+                printf "battery%%(%s): %0.2f%%\n", bat_name, (bat_now/bat_full)*(100);
+                printf "status(%s): %s\n", bat_name, (bat_status);
+                printf "discharge(%s): %0.2fW\n", bat_name, (bat_power_now/(1000*1000));
             }
-        printf "%.4f\n", (now / full) * 100
-    }'  /sys/class/power_supply/BAT*/energy_full \
-        /sys/class/power_supply/BAT*/energy_now
+        '
+    done
 }
 
 function waterfox_dev() {

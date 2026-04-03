@@ -7,8 +7,6 @@ if source "${HOME}/.shell_rc"; then
     main; ApplyShellTheme simple
 fi
 
-[[ -r ~/ly-session.log ]] && rm ~/ly-session.log
-
 function CD() {
     [[ -d "${1:-}" ]] || \
         { printf '[info]: %s\n' "Directory doesn't exist '${dir}'"; return 1; }
