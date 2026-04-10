@@ -195,7 +195,7 @@ function Export_vars() {
     HOME="${HOME:-$(printf ~)}"
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID:-$(id -u)}}"
     TMPDIR="${XDG_RUNTIME_DIR}/tmp/"
-    PAGER="less -c"
+    PAGER="bat --decorations=never --paging=always"
     LESS="-R"
     LESSCHARSET=utf-8
     schema_path="$(printf /nix/store/*gtk+3*/share/gsettings-schemas/* 2>&1 | cut -d' ' -f1 2>/dev/null)"
@@ -269,6 +269,7 @@ function Alias_vars() {
     alias safe_copy="rsync -aPh --fsync"
     alias mirror_copy="rsync -aPh --fsync --delete"
     alias remote_copy="rsync -aPz --compress-choice=zstd"
+    alias PAGER="bat --decorations=never --paging=always"
 
     # Metadata/file info aliases
     command -v exiftool &>/dev/null || alias exiftool="/usr/bin/vendor_perl/exiftool"

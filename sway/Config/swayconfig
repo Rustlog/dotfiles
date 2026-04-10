@@ -112,14 +112,14 @@ bar {
 
 ### Auto Start ###
 
+    # Start waybar
+    exec ~/.config/sway/scripts/WaybarThemes 1
     # Notification deamon
     exec mako --border-size=4 --border-radius=8 \
         --background-color='#333333' --default-timeout=6000 \
         --max-visible=4
     # Polkit agent for authorization
     exec /usr/lib*/polkit-kde*
-    # Start waybar
-    exec ~/.config/sway/scripts/WaybarThemes 1
     # Autotiling
     # exec autotiling
     # Playerctl daemon
@@ -190,7 +190,7 @@ bar {
         for_window [app_id="^(com.rtosta.zapzap|org.pulseaudio.pavucontrol)$"] floating enable
         for_window [app_id="^(nm-connection-editor|.*smile|.*obsproject.*)$"] floating enable
         for_window [app_id="^(.*pavucontrol.*|.*easyeffects.*)$|waterfox*|vivaldi*"] floating enable
-        for_window [app_id="^(org.kde.dolphin|.*systemmonitor)$"] floating enable
+        for_window [app_id="^(org.kde.dolphin|xdg-desktop-portal.*|.*systemmonitor)$"] floating enable
         for_window [app_id="^(blueman-manager|.*konsole|.*elisa)$"] floating enable
         for_window [app_id="^(.*okular|.*qutebrowser|.*kclock$)$"] floating enable
         for_window [class="^(Brave.*|ZapZap|discord|qutebrowser)$"] floating enable
