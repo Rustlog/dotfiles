@@ -196,7 +196,7 @@ function Export_vars() {
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID:-$(id -u)}}"
     TMPDIR="${XDG_RUNTIME_DIR}/tmp/"
     PAGER="bat --decorations=never --paging=always"
-    LESS="-R"
+    LESS="-Rc"
     LESSCHARSET=utf-8
     schema_path="$(printf /nix/store/*gtk+3*/share/gsettings-schemas/* 2>&1 | cut -d' ' -f1 2>/dev/null)"
     [[ -d "${schema_path}" ]] && XDG_DATA_DIRS="${XDG_DATA_DIRS}:${schema_path}"

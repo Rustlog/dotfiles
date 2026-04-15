@@ -2,6 +2,7 @@
 
 /* Everforest Dark Colors */
 @define-color background #2b3339;
+@define-color bg_waybar rgba(20, 20, 20, 0.94);
 @define-color background-light #323c41;
 @define-color foreground #d3c6aa;
 @define-color black #3c474d;
@@ -109,10 +110,9 @@
 }
 
 window#waybar {
-    background-color: @background;
+    background-color: @bg_waybar;
     color: @foreground;
 }
-
 
 /* Common module styling with border-bottom */
 #language, #clock, #cpu, #memory, #temperature, #battery,

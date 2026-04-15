@@ -97,7 +97,7 @@ command! RunCpp w | execute
     \ shellescape(expand('%:p:r')) . '; rm ' . shellescape(expand('%:p:r'))
 
 " Run C code
-command! RunC w | execute 
+command! RunC w | execute
     \ '!clang -x c -pedantic -Wall -Wextra -O0 ' . shellescape(expand('%:p')) . ' -o ' .
     \ shellescape(expand('%:p:r')) . ' && ' . shellescape(expand('%:p:r')) .
     \ ' ; rm ' . shellescape(expand('%:p:r'))
@@ -308,7 +308,7 @@ augroup END
 
 " C tmeplate
 autocmd BufNewFile *.c call setline(1, [
-    \ '//usr/bin/env gcc -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '//usr/bin/env gcc -Wall -Wextra -Werror -Wpedantic -pedantic -O0 -o "${0%.*}.bin" "${0}" && "${0%.*}.bin"; rm -f "${0%.*}.bin"; exit 0',
     \ '',
     \ '# include <stdio.h>',
     \ '# include <stdlib.h>',
@@ -323,7 +323,7 @@ autocmd BufNewFile *.c call setline(1, [
 
 " C++ tmeplate
 autocmd BufNewFile *.cpp,*.cxx,*.cc,*.c++ call setline(1, [
-    \ '//usr/bin/env gcc -x c++ -lstdc++ -Wall -pedantic -O0 -o "${0%.*}_bin" "${0}" && "${0%.*}_bin"; rm "${0%.*}_bin" 2> /dev/null; exit 0',
+    \ '//usr/bin/env g++ -Wall -Wextra -Werror -Wpedantic -pedantic -O0 -o "${0%.*}.bin" "${0}" && "${0%.*}.bin"; rm -f "${0%.*}.bin"; exit 0',
     \ '',
     \ '# include <iostream>',
     \ '# include <cstdlib>',
