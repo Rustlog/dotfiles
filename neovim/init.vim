@@ -64,7 +64,6 @@ nnoremap <silent><S-CR> :norm! o <CR>
 nnoremap <silent><C-S-CR> :norm! O <CR>
 " Toggle NerdTree with Ctrl + Space
 nnoremap <silent><C-Space> :NERDTreeToggle<CR>
-" Toggle wrap and nowrap with F2
 
 " Toggle wrap and nowrap with F2
 nnoremap <silent><F2> :call ToggleWrap() <CR>
@@ -77,7 +76,6 @@ function! CopyDateIntoRegister()
 endfunction
 
 nnoremap <silent><leader>D :call CopyDateIntoRegister()<RETURN>
-
 nnoremap <silent><leader>cr :for r in split('abcdefghijklmnopqrstuvwxyz1234567890/-', '\zs') <BAR> call setreg(r, '') <BAR> endfor <RETURN>
 
 " Toggle wrap lines
@@ -177,8 +175,8 @@ require("lazy").setup({
                 local cmp = require("cmp")
                 cmp.setup({
                     mapping = cmp.mapping.preset.insert({
-                        ["<CR>"] = cmp.mapping.confirm({ select = true }),
-                        ["<Tab>"] = cmp.mapping.select_next_item(),
+                        ["<CR>"]    = cmp.mapping.confirm({ select = true }),
+                        ["<Tab>"]   = cmp.mapping.select_next_item(),
                         ["<S-Tab>"] = cmp.mapping.select_prev_item(),
                     }),
                     sources = {
