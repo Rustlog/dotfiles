@@ -26,6 +26,9 @@ filetype plugin indent on
 set background=dark
 " prevent inode change
 set backupcopy=yes
+" enable folding
+set foldmethod=indent
+set foldlevel=40
 
 " Enable swap files (saves the cursor position and other information)
 set swapfile
@@ -164,21 +167,32 @@ require("lazy").setup({
         -- Completion + UI
         {
             "hrsh7th/nvim-cmp",
-            dependencies = { "hrsh7th/cmp-nvim-lsp" }, event = "InsertEnter",
+            dependencies = {
+                "hrsh7th/cmp-nvim-lsp",
+                "hrsh7th/cmp-buffer",
+                "hrsh7th/cmp-path",
+            },
+            event = { "InsertEnter", "CmdlineEnter" },
             config = function()
                 local cmp = require("cmp")
                 cmp.setup({
                     mapping = cmp.mapping.preset.insert({
                         ["<CR>"] = cmp.mapping.confirm({ select = true }),
+                        ["<Tab>"] = cmp.mapping.select_next_item(),
+                        ["<S-Tab>"] = cmp.mapping.select_prev_item(),
                     }),
                     sources = {
                         { name = "nvim_lsp" },
+                        { name = "buffer" },
+                        { name = "path" },
                     },
                 })
             end
         },
     },
 })
+
+local cmp_capabilities = require("cmp_nvim_lsp").default_capabilities()
 
 local lsp_servers = {
     bashls = { },
@@ -192,9 +206,12 @@ local lsp_servers = {
     html = { },
     cssls = { },
     jsonls = { },
+    nginx_language_server = { },
+    pyright = { },
 }
 
 for server,config in pairs(lsp_servers) do
+    config.capabilities = cmp_capabilities
     vim.lsp.config(server, config)
     vim.lsp.enable(server)
 end
