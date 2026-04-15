@@ -145,139 +145,86 @@ require("lazy").setup({
     concurrency   = 20,
 
     spec = {
-      -- Core plugins
-        { "octol/vim-cpp-enhanced-highlight",                                                               },
-        { "nvim-lua/plenary.nvim",                                                                          },
-        { "tpope/vim-commentary",             event = "VeryLazy"                                            },
-        { "nvim-telescope/telescope.nvim",    dependencies = { "nvim-lua/plenary.nvim" },
-        cmd =  "Telescope", keys = { { "<C-n>", "<cmd>Telescope find_files<CR>" , desc = "Find files"}}     },
-        { "nvim-lualine/lualine.nvim",        dependencies = { "nvim-tree/nvim-web-devicons" },
-                                              event = "VeryLazy",
-                                              opts = {
-                                                  options = { theme = "papercolor_dark" }
-                                              }                                                             },
-        { "nvim-telescope/telescope.nvim",    dependencies = "nvim-lua/plenary.nvim"                        },
-        { "echasnovski/mini.align",           branch = "stable", config = true                              },
-        { "puremourning/vimspector"                                                                         },
-        { "MeanderingProgrammer/render-markdown.nvim",
-                                              ft = {"markdown","quarto"}, config = true                     },
-        -- COLORSCHEMES
-        { "folke/tokyonight.nvim", lazy = false, priority = 1000, name = "tokyonight"                       },
-        { "morhetz/gruvbox", lazy = false, priority = 1000                                                  },
-        { "tomasr/molokai", lazy = false, priority = 1000                                                   },
-        { "ricardoraposo/nightwolf.nvim", lazy = false, priority = 1000                                     },
-        { "catppuccin/nvim", name = "catppuccin", lazy = false, priority = 1000                             },
-
-        -- Native lsp stack
-        { "williamboman/mason.nvim", config = true                                                          },
-        { "neovim/nvim-lspconfig"                                                                           },
-
-        -- COMPLETION (Enter confirms)
-        { "hrsh7th/nvim-cmp", event = "InsertEnter", dependencies = {
-            "hrsh7th/cmp-nvim-lsp",
-            "hrsh7th/cmp-buffer",
-            "hrsh7th/cmp-path",
-            "L3MON4D3/LuaSnip",
-            "saadparwaiz1/cmp_luasnip",
-          }, config = function()
-            local cmp = require("cmp")
-            cmp.setup{
-              snippet = { expand = function(args) require("luasnip").lsp_expand(args.body) end },
-              mapping = cmp.mapping.preset.insert({
-                ["<CR>"]  = cmp.mapping.confirm({ select = true }),  -- Enter = confirm
-                ["<Tab>"] = cmp.mapping.select_next_item(),
-                ["<S-Tab>"] = cmp.mapping.select_prev_item(),
-              }),
-              sources = {
-                { name = "nvim_lsp" },
-                { name = "luasnip" },
-                { name = "buffer" },
-                { name = "path" },
-              },
-            }
-          end,
-        },
-
-        -- Auto-install servers + keymaps
+        -- core
         {
-            "williamboman/mason-lspconfig.nvim",
-            dependencies = {
-                "williamboman/mason.nvim",
-                "neovim/nvim-lspconfig",  -- Provides default configs
-            },
-            event = "InsertEnter",
-            config = function()
-            require("mason").setup()
-
-            -- Capabilities for nvim-cmp (extend LSP defaults)
-            local capabilities = require("cmp_nvim_lsp").default_capabilities()
-
-            require("mason-lspconfig").setup({
-              ensure_installed = {
-                -- "lua_ls", "ts_ls", "pyright", "rust_analyzer",
-                -- "gopls", "bashls", "html", "cssls", "jsonls",
-                -- "volar",
-                -- "sqlls", "cmake",
-                -- "clangd"
-              },
-              automatic_installation = true,
-              handlers = {
-                -- Default handler: Extend defaults with capabilities and enable
-                function(server_name)
-                  local config = vim.lsp.config[server_name] or {}
-                  vim.lsp.config[server_name] = vim.tbl_deep_extend(
-                    "force",
-                    config,
-                    {
-                      capabilities = vim.tbl_deep_extend("force",
-                            config.capabilities or {}, capabilities),
-                      on_init = config.on_init,
-                      on_attach = config.on_attach,
-                    }
-                  )
-                  vim.lsp.enable(server_name)
-                end,
-                -- Override for clangd with specific flags
-                ["clangd"] = function()
-                  local config = vim.lsp.config["clangd"] or {}
-                  vim.lsp.config["clangd"] = vim.tbl_deep_extend(
-                    "force",
-                    config,
-                    {
-                      default_config = {
-                        cmd = { "clangd", "--background-index",
-                                "--clang-tidy", "--header-insertion=iwyu" },
-                      },
-                      capabilities = vim.tbl_deep_extend("force",
-                            config.capabilities or {}, capabilities),
-                    }
-                  )
-                  vim.lsp.enable("clangd")
-                end,
-              },
-            })
-
-            -- Global LSP keymaps (attached on LspAttach)
-            vim.api.nvim_create_autocmd("LspAttach", {
-              callback = function(ev)
-                local opts = { buffer = ev.buf, silent = true }
-                vim.keymap.set("n", "gd", vim.lsp.buf.definition,
-                        vim.tbl_extend("force", opts, { desc = "Goto Definition" }))
-                vim.keymap.set("n", "gr", vim.lsp.buf.references,
-                        vim.tbl_extend("force", opts, { desc = "Goto References" }))
-                vim.keymap.set("n", "K", vim.lsp.buf.hover,
-                        vim.tbl_extend("force", opts, { desc = "Hover" }))
-                vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename,
-                        vim.tbl_extend("force", opts, { desc = "Rename" }))
-                vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action,
-                        vim.tbl_extend("force", opts, { desc = "Code Action" }))
-              end,
-            })
-          end,
+            "nvim-lualine/lualine.nvim",
+            dependencies = { "nvim-tree/nvim-web-devicons" }, event = "VeryLazy",
+            opts = { options = { theme = "papercolor_dark" } }
         },
-    }
+        { "nvim-telescope/telescope.nvim", dependencies = "nvim-lua/plenary.nvim", cmd = "Telescope" },
 
+        -- Colorscheme
+        { "morhetz/gruvbox", lazy = false },
+        { "folke/tokyonight.nvim", name = "tokyonight", lazy = false },
+        { "tomasr/molokai", lazy = false },
+
+        -- LSP
+        { "neovim/nvim-lspconfig", event = { "BufReadPre", "BufNewFile" } },
+
+        -- Completion + UI
+        {
+            "hrsh7th/nvim-cmp",
+            dependencies = { "hrsh7th/cmp-nvim-lsp" }, event = "InsertEnter",
+            config = function()
+                local cmp = require("cmp")
+                cmp.setup({
+                    mapping = cmp.mapping.preset.insert({
+                        ["<CR>"] = cmp.mapping.confirm({ select = true }),
+                    }),
+                    sources = {
+                        { name = "nvim_lsp" },
+                    },
+                })
+            end
+        },
+    },
 })
+
+local lsp_servers = {
+    bashls = { },
+    rust_analyzer = { },
+    ts_ls = { },
+    lua_ls = { },
+    nil_ls = { },
+    clangd = { },
+    gopls = { },
+    yamlls = { },
+    html = { },
+    cssls = { },
+    jsonls = { },
+}
+
+for server,config in pairs(lsp_servers) do
+    vim.lsp.config(server, config)
+    vim.lsp.enable(server)
+end
+
+vim.api.nvim_create_autocmd("LspAttach", {
+  callback = function(ev)
+    local opts = { buffer = ev.buf, silent = true }
+
+    vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+    vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
+    vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+    vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+    vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+    vim.keymap.set("n", "gl", vim.diagnostic.open_float)
+  end,
+})
+
+vim.diagnostic.config({
+    virtual_text = {
+        prefix = "●",
+    },
+    signs = true,
+    underline = true,
+    float = {
+        border = "rounded",
+        source = true,
+    },
+})
+
+
 EOF
 
 " :) Afer plugins load
